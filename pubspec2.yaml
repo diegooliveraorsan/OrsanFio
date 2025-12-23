@@ -1,0 +1,47 @@
+name: orsanfio
+description: "Aplicacion de Orsan evaluaciones"
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+4
+
+environment:
+  sdk: '>=2.19.0 <3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  url_launcher: ^6.1.11
+  uuid: ^4.2.1
+  http: ^1.1.0
+  image_picker: ^1.0.4
+  image: ^4.0.17
+  path_provider: ^2.1.1
+
+
+  mobile_scanner: ^7.1.2
+  camera: ^0.10.5+1
+  device_info_plus: ^9.0.0
+  firebase_core: ^2.24.0
+  firebase_messaging: ^14.7.0
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: "^0.13.1"
+
+
+flutter:
+  assets:
+    - assets/images/logo_orsan.png
+    - assets/images/logo_fio.png
+
+  uses-material-design: true
+
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icons/icon_330x330.jpeg"

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "940878218377",
+    "project_id": "orsanfio",
+    "storage_bucket": "orsanfio.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:940878218377:android:9a3fe3f623b1e3f44df258",
+        "android_client_info": {
+          "package_name": "Orsanfio.orsanevaluaciones.cl.orsanfio"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBepLqQCnPhBFEwW_5vjd0p76ZskXeZTqQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:940878218377:android:253275b624ddef934df258",
+        "android_client_info": {
+          "package_name": "com.orsanfio.orsanfio"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBepLqQCnPhBFEwW_5vjd0p76ZskXeZTqQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Orsanfio</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>orsanfio</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+
+	<!-- =========================================== -->
+	<!-- 🔔 PERMISOS PARA NOTIFICACIONES PUSH (iOS) -->
+	<!-- =========================================== -->
+
+	<!-- Permiso para mostrar notificaciones (iOS 10+) -->
+	<key>UserNotificationUsageDescription</key>
+	<string>Recibir notificaciones sobre transacciones y actualizaciones importantes.</string>
+
+	<!-- Para notificaciones silenciosas/background -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+
+	<!-- Permiso provisional (iOS 12+) - opcional -->
+	<key>NSProvisionalUserNotificationUsageDescription</key>
+	<string>Recibir notificaciones provisionales sobre transacciones.</string>
+
+	<!-- Para notificaciones críticas (iOS 12+) - opcional -->
+	<key>UNNotificationCriticalAlertUsageDescription</key>
+	<string>Recibir notificaciones críticas sobre transacciones urgentes.</string>
+
+	<!-- =========================================== -->
+	<!-- 📷 PERMISOS NECESARIOS PARA LIVENESS -->
+	<!-- =========================================== -->
+
+	<key>NSCameraUsageDescription</key>
+	<string>Se necesita acceso a la cámara para la verificación facial y captura de selfies para validación de identidad.</string>
+
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Se necesita acceso al micrófono para la grabación de video durante la verificación de vivacidad.</string>
+
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Se necesita acceso a la galería para seleccionar imágenes de documentos de identidad.</string>
+
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Se necesita permiso para guardar imágenes en la galería si el usuario lo solicita.</string>
+
+	<!-- =========================================== -->
+	<!-- ⚙️ OTRAS CONFIGURACIONES -->
+	<!-- =========================================== -->
+
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+
+	<key>UIRequiresFullScreen</key>
+	<true/>
+
+	<!-- Para Firebase/Analytics -->
+	<key>FirebaseScreenReportingEnabled</key>
+	<true/>
+
+	<!-- Para evitar cortes de audio en background -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>audio</string> <!-- Si usas audio en liveness -->
+	</array>
+</dict>
+</plist>

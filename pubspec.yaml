@@ -1,0 +1,74 @@
+name: orsanfio
+description: "Aplicacion de Orsan evaluaciones"
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+4
+
+environment:
+  sdk: '>=2.19.0 <3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP y Networking
+  http: ^1.1.0
+
+  # Imágenes y Cámara
+  camera: ^0.10.5+1
+  image_picker: ^1.0.4
+  image: ^4.0.17
+
+  # UUID
+  uuid: ^4.2.1
+
+  # URL y navegación
+  url_launcher: ^6.1.11
+
+  # QR/Barcode Scanner
+  mobile_scanner: ^7.1.2
+
+  # Device info
+  device_info_plus: ^9.0.0
+
+  # Firebase
+  firebase_core: ^2.24.0
+  firebase_messaging: ^14.7.0
+
+  # Storage
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.1
+
+  # ✅ NUEVAS DEPENDENCIAS PARA LIVENESS V2
+  video_player: ^2.8.3  # Para previsualización de video si aw implementa grabación
+  permission_handler: ^11.0.0  # Para manejo de permisos de cámara/micrófono
+  video_compress: ^3.1.0  # Para comprimir video
+
+  # Opcional: Para mejor manejo de imágenes
+  flutter_image_compress: ^2.0.8  # Mejor compresión de imágenes que la nativa
+
+  # Opcional: Para animaciones más fluidas
+  animations: ^2.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_face_api: ^7.2.540
+  flutter_face_core_basic: ^7.2.540
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: "^0.13.1"
+
+flutter:
+  assets:
+    - assets/images/logo_orsan.png
+    - assets/images/logo_fio.png
+
+
+  uses-material-design: true
+
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icons/icon_330x330.jpeg"
