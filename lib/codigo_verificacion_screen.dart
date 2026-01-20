@@ -39,6 +39,34 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
   // ✅ TIMER PARA ACTUALIZAR EL CONTADOR
   Timer? _timer;
 
+  // ✅ VALIDACIÓN DE CONTRASEÑA SEGURA
+  bool _esContrasenaSegura(String contrasena) {
+    if (contrasena.length < 8) return false;
+
+    // Al menos una mayúscula
+    if (!RegExp(r'[A-Z]').hasMatch(contrasena)) return false;
+
+    // Al menos un número
+    if (!RegExp(r'[0-9]').hasMatch(contrasena)) return false;
+
+    // Al menos un símbolo especial
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(contrasena)) return false;
+
+    return true;
+  }
+
+  // ✅ OBTENER MENSAJES DE ERROR DE VALIDACIÓN
+  String? _validarContrasena(String contrasena) {
+    if (contrasena.isEmpty) return 'La contraseña es obligatoria';
+    if (contrasena.length < 8) return 'Mínimo 8 caracteres';
+    if (!RegExp(r'[A-Z]').hasMatch(contrasena)) return 'Al menos una mayúscula';
+    if (!RegExp(r'[0-9]').hasMatch(contrasena)) return 'Al menos un número';
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(contrasena)) {
+      return 'Al menos un símbolo (!@#\$%^&*)';
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +79,10 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
 
     // ✅ Escuchar cambios en los campos de texto
     _codigoController.addListener(_actualizarEstadoBoton);
-    _nuevaPasswordController.addListener(_actualizarEstadoBoton);
+    _nuevaPasswordController.addListener(() {
+      _actualizarEstadoBoton();
+      setState(() {}); // Para actualizar el indicador en tiempo real
+    });
     _confirmarPasswordController.addListener(_actualizarEstadoBoton);
   }
 
@@ -61,7 +92,10 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
     _timer?.cancel();
     // ✅ Limpiar listeners
     _codigoController.removeListener(_actualizarEstadoBoton);
-    _nuevaPasswordController.removeListener(_actualizarEstadoBoton);
+    _nuevaPasswordController.removeListener(() {
+      _actualizarEstadoBoton();
+      setState(() {});
+    });
     _confirmarPasswordController.removeListener(_actualizarEstadoBoton);
     super.dispose();
   }
@@ -81,10 +115,12 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
     // 1. Código tiene 8 caracteres
     // 2. Ambos campos de contraseña están llenos
     // 3. Las contraseñas son iguales
+    // 4. La contraseña cumple con los requisitos de seguridad
     return codigo.length == 8 &&
         nuevaPassword.isNotEmpty &&
         confirmarPassword.isNotEmpty &&
         nuevaPassword == confirmarPassword &&
+        _esContrasenaSegura(nuevaPassword) &&
         !_isLoading; // También verificar que no esté cargando
   }
 
@@ -215,13 +251,12 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
       return;
     }
 
-    // ✅ COMENTADO: Validación de longitud mínima de contraseña
-    /*
-    if (nuevaPassword.length < 6) {
-      _mostrarError('La contraseña debe tener al menos 6 caracteres');
+    // ✅ VALIDACIÓN DE CONTRASEÑA SEGURA
+    final errorValidacion = _validarContrasena(nuevaPassword);
+    if (errorValidacion != null) {
+      _mostrarError('Contraseña insegura: $errorValidacion');
       return;
     }
-    */
 
     // Verificar si el código ha expirado (10 minutos) - SOLO si se ha enviado un código
     if (_horaEnvioCodigo != null) {
@@ -398,6 +433,64 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
   // ✅ Verificar si el código ha expirado
   bool _codigoExpirado() {
     return _getSegundosRestantes() <= 0;
+  }
+
+  // ✅ Widget para mostrar indicadores de fortaleza de contraseña
+  Widget _buildPasswordStrengthIndicator(String password) {
+    if (password.isEmpty) return const SizedBox.shrink();
+
+    final tieneLongitud = password.length >= 8;
+    final tieneMayuscula = RegExp(r'[A-Z]').hasMatch(password);
+    final tieneNumero = RegExp(r'[0-9]').hasMatch(password);
+    final tieneSimbolo = RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Text(
+          'Fortaleza de contraseña:',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            _buildRequirementIndicator('8+ chars', tieneLongitud),
+            const SizedBox(width: 8),
+            _buildRequirementIndicator('MAYÚS', tieneMayuscula),
+            const SizedBox(width: 8),
+            _buildRequirementIndicator('NÚM', tieneNumero),
+            const SizedBox(width: 8),
+            _buildRequirementIndicator('SÍM', tieneSimbolo),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRequirementIndicator(String label, bool cumple) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: cumple ? Colors.green.shade50 : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: cumple ? Colors.green.shade300 : Colors.grey.shade300,
+          width: 1,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: cumple ? Colors.green.shade800 : Colors.grey.shade600,
+        ),
+      ),
+    );
   }
 
   @override
@@ -624,6 +717,9 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
             TextFormField(
               controller: _nuevaPasswordController,
               obscureText: !_mostrarContrasena,
+              onChanged: (value) {
+                setState(() {}); // Para actualizar el indicador en tiempo real
+              },
               decoration: InputDecoration(
                 hintText: 'Ingresa nueva contraseña',
                 border: OutlineInputBorder(
@@ -656,6 +752,9 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
               ),
               textInputAction: TextInputAction.next,
             ),
+
+            // ✅ INDICADOR DE FORTALEZA DE CONTRASEÑA EN TIEMPO REAL
+            _buildPasswordStrengthIndicator(_nuevaPasswordController.text),
 
             const SizedBox(height: 16),
 
@@ -705,7 +804,53 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
               textInputAction: TextInputAction.done,
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+
+            // ✅ INFORMACIÓN ADICIONAL MEJORADA
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200, width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.security, size: 16, color: _blueDarkColor),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Requisitos de seguridad',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildRequirementItem('Mínimo 8 caracteres'),
+                  _buildRequirementItem('Al menos una letra mayúscula'),
+                  _buildRequirementItem('Al menos un número (0-9)'),
+                  _buildRequirementItem('Al menos un símbolo (! @ # \$ % ^ & *)'),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ejemplo seguro: "Passw0rd\$2026"',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
 
             // ✅ BOTÓN PARA CONFIRMAR CAMBIO DE CONTRASEÑA
             SizedBox(
@@ -743,6 +888,27 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRequirementItem(String text) {
+    return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle, size: 14, color: Colors.green.shade600),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
+          ],
+        )
     );
   }
 }

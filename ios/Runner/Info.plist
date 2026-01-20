@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -22,12 +24,33 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FirebaseScreenReportingEnabled</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Se necesita acceso a la cámara para la verificación facial y captura de selfies para validación de identidad.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Se necesita acceso al micrófono para la grabación de video durante la verificación de vivacidad.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Se necesita permiso para guardar imágenes en la galería si el usuario lo solicita.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Se necesita acceso a la galería para seleccionar imágenes de documentos de identidad.</string>
+	<key>NSProvisionalUserNotificationUsageDescription</key>
+	<string>Recibir notificaciones provisionales sobre transacciones.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>audio</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
+	<string>LaunchScreen.storyboard</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -39,68 +62,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-
-	<!-- =========================================== -->
-	<!-- 🔔 PERMISOS PARA NOTIFICACIONES PUSH (iOS) -->
-	<!-- =========================================== -->
-
-	<!-- Permiso para mostrar notificaciones (iOS 10+) -->
-	<key>UserNotificationUsageDescription</key>
-	<string>Recibir notificaciones sobre transacciones y actualizaciones importantes.</string>
-
-	<!-- Para notificaciones silenciosas/background -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-
-	<!-- Permiso provisional (iOS 12+) - opcional -->
-	<key>NSProvisionalUserNotificationUsageDescription</key>
-	<string>Recibir notificaciones provisionales sobre transacciones.</string>
-
-	<!-- Para notificaciones críticas (iOS 12+) - opcional -->
-	<key>UNNotificationCriticalAlertUsageDescription</key>
-	<string>Recibir notificaciones críticas sobre transacciones urgentes.</string>
-
-	<!-- =========================================== -->
-	<!-- 📷 PERMISOS NECESARIOS PARA LIVENESS -->
-	<!-- =========================================== -->
-
-	<key>NSCameraUsageDescription</key>
-	<string>Se necesita acceso a la cámara para la verificación facial y captura de selfies para validación de identidad.</string>
-
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Se necesita acceso al micrófono para la grabación de video durante la verificación de vivacidad.</string>
-
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Se necesita acceso a la galería para seleccionar imágenes de documentos de identidad.</string>
-
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Se necesita permiso para guardar imágenes en la galería si el usuario lo solicita.</string>
-
-	<!-- =========================================== -->
-	<!-- ⚙️ OTRAS CONFIGURACIONES -->
-	<!-- =========================================== -->
-
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-
-	<key>UIRequiresFullScreen</key>
-	<true/>
-
-	<!-- Para Firebase/Analytics -->
-	<key>FirebaseScreenReportingEnabled</key>
-	<true/>
-
-	<!-- Para evitar cortes de audio en background -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-		<string>audio</string> <!-- Si usas audio en liveness -->
-	</array>
+	<key>UNNotificationCriticalAlertUsageDescription</key>
+	<string>Recibir notificaciones críticas sobre transacciones urgentes.</string>
+	<key>UserNotificationUsageDescription</key>
+	<string>Recibir notificaciones sobre transacciones y actualizaciones importantes.</string>
 </dict>
 </plist>

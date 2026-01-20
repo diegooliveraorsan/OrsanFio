@@ -1,18 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'variables_globales.dart';
+
+// ✅ ESTILOS ESTANDARIZADOS PARA SNACKBARS (MISMO COLOR GRIS)
+void mostrarSnackBar(BuildContext context, String mensaje) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        mensaje,
+        style: const TextStyle(color: Colors.white),
+      ),
+      backgroundColor: Colors.grey[800], // Color gris oscuro
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
+  );
+}
+
+// ✅ REINICIAR LA APLICACIÓN NAVEGANDO AL MAIN
+void reiniciarAplicacion(BuildContext context) {
+  print('🔄 Reiniciando aplicación desde SalesHistoryScreen...');
+
+  Navigator.pushNamedAndRemoveUntil(
+    context,
+    '/',
+        (route) => false,
+  );
+
+  if (Navigator.canPop(context)) {
+    Navigator.popUntil(context, (route) => route.isFirst);
+  }
+}
 
 class SalesHistoryScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
   final String? empresaSeleccionada;
-  final VoidCallback? onRefresh; // ✅ NUEVO: Callback para refrescar datos globales
+  final VoidCallback? onRefresh;
 
   const SalesHistoryScreen({
     super.key,
     required this.userData,
     this.empresaSeleccionada,
-    this.onRefresh, // ✅ NUEVO: Parámetro opcional para refrescar datos
+    this.onRefresh,
   });
 
   @override
@@ -24,33 +59,150 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   List<dynamic> _filteredSales = [];
   bool _isLoading = true;
   bool _isRefreshing = false;
+  bool _initializingToken = true;
   String _errorMessage = '';
   String _selectedFilter = 'approved';
+  String? _deviceToken;
+  String? _lastEmpresaSeleccionada; // ✅ Para trackear cambios
 
   @override
   void initState() {
     super.initState();
-    _fetchSalesHistory();
+    _lastEmpresaSeleccionada = widget.empresaSeleccionada;
+
+    print('🎯 SalesHistoryScreen initState llamado');
+    print('   Empresa seleccionada: ${widget.empresaSeleccionada}');
+
+    // ✅ CARGAR DATOS INMEDIATAMENTE AL INICIAR
+    _loadInitialData();
   }
 
-  // ✅ CORREGIDO: Método para manejar el pull-to-refresh que retorna Future<void>
+  // ✅ MÉTODO MEJORADO: CARGAR DATOS INICIALES
+  Future<void> _loadInitialData() async {
+    print('🔄 Cargando datos iniciales para SalesHistoryScreen...');
+
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = '';
+      });
+
+      // ✅ INICIALIZAR TOKEN PRIMERO
+      await _initializeDeviceToken();
+
+      // ✅ ESPERAR UN MOMENTO PARA QUE EL TOKEN SE INICIALICE
+      if (_deviceToken == null) {
+        print('⚠️ Token FCM aún no disponible, esperando...');
+        await Future.delayed(const Duration(seconds: 1));
+
+        if (_deviceToken == null) {
+          print('⚠️ Creando token de fallback para carga inicial');
+          _deviceToken = 'initial_fallback_${DateTime.now().millisecondsSinceEpoch}';
+        }
+      }
+
+      // ✅ CARGAR HISTORIAL DE VENTAS
+      await _fetchSalesHistory();
+
+    } catch (e) {
+      print('❌ Error en carga inicial: $e');
+      setState(() {
+        _errorMessage = 'Error al cargar historial: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ✅ NUEVO MÉTODO: DID UPDATE WIDGET - PARA REACCIONAR A CAMBIOS DE EMPRESA
+  @override
+  void didUpdateWidget(SalesHistoryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    print('🔄 SalesHistoryScreen - didUpdateWidget llamado');
+    print('   Empresa anterior: ${oldWidget.empresaSeleccionada}');
+    print('   Empresa nueva: ${widget.empresaSeleccionada}');
+
+    // Verificar si la empresa seleccionada ha cambiado
+    if (widget.empresaSeleccionada != _lastEmpresaSeleccionada) {
+      print('🎯 ¡Empresa cambiada! Recargando historial de ventas...');
+      _lastEmpresaSeleccionada = widget.empresaSeleccionada;
+
+      // Recargar los datos de ventas para la nueva empresa
+      _fetchSalesHistory();
+    }
+  }
+
+  // ✅ OBTENER TOKEN DEL DISPOSITIVO (FCM) - CORREGIDO
+  Future<void> _initializeDeviceToken() async {
+    try {
+      if (_deviceToken != null) {
+        print('✅ Token FCM ya inicializado');
+        return;
+      }
+
+      print('🔄 Inicializando Firebase...');
+      await Firebase.initializeApp();
+
+      print('🔄 Obteniendo token FCM...');
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+      if (fcmToken != null) {
+        print('✅ Token FCM obtenido exitosamente');
+        setState(() {
+          _deviceToken = fcmToken;
+        });
+      } else {
+        print('⚠️ Token FCM es null, usando fallback');
+        // Intentar nuevamente después de un breve retraso
+        await Future.delayed(const Duration(seconds: 1));
+        fcmToken = await FirebaseMessaging.instance.getToken();
+
+        if (fcmToken != null) {
+          print('✅ Token FCM obtenido en segundo intento');
+          setState(() {
+            _deviceToken = fcmToken;
+          });
+        } else {
+          print('⚠️ No se pudo obtener token FCM, creando fallback');
+          final String fallbackToken = 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
+          setState(() {
+            _deviceToken = fallbackToken;
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ Error obteniendo token FCM: $e');
+      // Crear un token de fallback incluso si hay error
+      final String errorToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
+      setState(() {
+        _deviceToken = errorToken;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _initializingToken = false;
+        });
+      }
+    }
+  }
+
   Future<void> _onRefresh() async {
     print('🔄 Pull to refresh en SalesHistoryScreen');
+    print('   Empresa actual: ${widget.empresaSeleccionada}');
 
     setState(() {
       _isRefreshing = true;
     });
 
     try {
-      // ✅ ACTUALIZAR DATOS GLOBALES SI HAY CALLBACK
+      // Primero llamar al refresh del padre si existe
       if (widget.onRefresh != null) {
-        widget.onRefresh!();
+        widget.onRefresh!(); // Solo llamar, sin await
       }
 
-      // ✅ ACTUALIZAR DATOS LOCALES
+      // Luego actualizar nuestro propio historial
       await _fetchSalesHistory();
 
-      // ✅ PEQUEÑO DELAY PARA QUE SE VEA EL INDICADOR
       await Future.delayed(const Duration(milliseconds: 500));
     } catch (e) {
       print('❌ Error durante refresh: $e');
@@ -63,7 +215,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
-  // ✅ WIDGET CON PULL-TO-REFRESH
   Widget _buildRefreshableContent() {
     return RefreshIndicator(
       onRefresh: _onRefresh,
@@ -75,11 +226,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  // ✅ CONTENIDO PRINCIPAL (DISEÑO ORIGINAL)
   Widget _buildContent() {
     return Column(
       children: [
-        // ✅ FILTRO EN PARTE SUPERIOR (DISEÑO ORIGINAL)
         Container(
           padding: const EdgeInsets.all(16),
           color: Colors.grey.shade50,
@@ -144,7 +293,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  // ✅ MÉTODO CORREGIDO: FILTRAR VENTAS CON ESTADOS ACTUALIZADOS
   void _filterSales() {
     setState(() {
       switch (_selectedFilter) {
@@ -175,7 +323,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     });
   }
 
-  // ✅ MÉTODO MEJORADO: OBTENER EL HISTORIAL DE VENTAS CON FILTRADO POR EMPRESA
+  // ✅ API ACTUALIZADA A v2 CON TOKEN DISPOSITIVO - CORREGIDA
   Future<void> _fetchSalesHistory() async {
     try {
       if (!_isRefreshing) {
@@ -185,16 +333,59 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         });
       }
 
+      print('🎯 _fetchSalesHistory llamado');
+      print('   Empresa seleccionada: ${widget.empresaSeleccionada}');
+      print('   Token dispositivo: ${_deviceToken?.substring(0, 20)}...');
+
+      // ✅ VERIFICAR SI TENEMOS UNA EMPRESA SELECCIONADA
+      if (widget.empresaSeleccionada == null || widget.empresaSeleccionada!.isEmpty) {
+        print('⚠️ No hay empresa seleccionada, no se puede cargar historial');
+        setState(() {
+          _sales = [];
+          _filteredSales = [];
+          _isLoading = false;
+          _isRefreshing = false;
+          _errorMessage = 'Selecciona una empresa para ver el historial de compras';
+        });
+        return;
+      }
+
+      // ✅ VERIFICAR QUE TENEMOS TOKEN DEL DISPOSITIVO
+      if (_deviceToken == null) {
+        print('❌ _deviceToken es null, intentando obtenerlo nuevamente...');
+        await _initializeDeviceToken();
+
+        if (_deviceToken == null) {
+          print('❌ No se pudo obtener el token del dispositivo');
+          setState(() {
+            _isLoading = false;
+            _isRefreshing = false;
+            _errorMessage = 'No se pudo obtener el token del dispositivo. Intenta nuevamente.';
+          });
+          return;
+        }
+      }
+
       final String tokenComprador = _getTokenComprador();
 
-      print('🔄 Iniciando llamada a API VentasEmpresa...');
+      if (tokenComprador.isEmpty) {
+        print('❌ token_comprador está vacío');
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+          _errorMessage = 'No se pudo obtener la información del usuario';
+        });
+        return;
+      }
+
+      print('🔄 Iniciando llamada a API VentasEmpresa (v2)...');
       print('📤 Request body:');
       print('  - token_comprador: $tokenComprador');
-      print('  - empresa_seleccionada: ${widget.empresaSeleccionada}');
-      print('🌐 URL: ${GlobalVariables.baseUrl}/VentasEmpresa/api/v1/');
+      print('  - token_dispositivo: ${_deviceToken!.substring(0, 20)}...');
+      print('🌐 URL: ${GlobalVariables.baseUrl}/VentasEmpresa/api/v2/');
 
       final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/VentasEmpresa/api/v1/'),
+        Uri.parse('${GlobalVariables.baseUrl}/VentasEmpresa/api/v2/'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -202,6 +393,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         },
         body: json.encode({
           "token_comprador": tokenComprador,
+          "token_dispositivo": _deviceToken!,
         }),
       ).timeout(const Duration(seconds: 15));
 
@@ -211,8 +403,16 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
 
+        // ✅ VERIFICAR SI LA SESIÓN HA EXPIRADO
+        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
+          mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
+          reiniciarAplicacion(context);
+          return;
+        }
+
         print('✅ API Response data:');
         print('  - success: ${responseData['success']}');
+        print('  - sesion_iniciada: ${responseData['sesion_iniciada']}');
         print('  - total_empresas: ${responseData['total_empresas']}');
 
         if (responseData['success'] == true) {
@@ -222,7 +422,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           if (empresasVentas.isNotEmpty) {
             List<dynamic> todasLasVentas = [];
 
-            // ✅ RECOLECTAR TODAS LAS VENTAS DE TODAS LAS EMPRESAS
             for (final empVentas in empresasVentas) {
               if (empVentas is Map<String, dynamic>) {
                 final ventas = empVentas['ventas'] ?? [];
@@ -234,31 +433,24 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
             print('📦 Total de ventas encontradas (todas las empresas): ${todasLasVentas.length}');
 
-            // ✅ FILTRAR VENTAS POR EMPRESA SELECCIONADA
             List<dynamic> ventasFiltradas = [];
 
-            if (widget.empresaSeleccionada != null) {
-              print('🎯 Filtrando ventas para empresa: ${widget.empresaSeleccionada}');
+            // ✅ SIEMPRE FILTRAR POR EMPRESA SELECCIONADA
+            print('🎯 Filtrando ventas para empresa: ${widget.empresaSeleccionada}');
 
-              for (final venta in todasLasVentas) {
-                if (venta is Map<String, dynamic>) {
-                  // Buscar la empresa asociada a esta venta
-                  final empresaVenta = _findEmpresaForVenta(venta, empresasVentas);
-                  if (empresaVenta != null) {
-                    final tokenEmpresa = empresaVenta['token_empresa']?.toString();
-                    if (tokenEmpresa == widget.empresaSeleccionada) {
-                      ventasFiltradas.add(venta);
-                    }
+            for (final venta in todasLasVentas) {
+              if (venta is Map<String, dynamic>) {
+                final empresaVenta = _findEmpresaForVenta(venta, empresasVentas);
+                if (empresaVenta != null) {
+                  final tokenEmpresa = empresaVenta['token_empresa']?.toString();
+                  if (tokenEmpresa == widget.empresaSeleccionada) {
+                    ventasFiltradas.add(venta);
                   }
                 }
               }
-
-              print('✅ Ventas filtradas para empresa seleccionada: ${ventasFiltradas.length}');
-            } else {
-              // Si no hay empresa seleccionada, mostrar todas las ventas
-              ventasFiltradas = todasLasVentas;
-              print('ℹ️ No hay empresa seleccionada, mostrando todas las ventas: ${ventasFiltradas.length}');
             }
+
+            print('✅ Ventas filtradas para empresa seleccionada: ${ventasFiltradas.length}');
 
             setState(() {
               _sales = ventasFiltradas;
@@ -266,22 +458,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
             _filterSales();
 
-            // ✅ Imprimir detalles de cada venta filtrada
-            for (var i = 0; i < ventasFiltradas.length; i++) {
-              final venta = ventasFiltradas[i];
-              if (venta is Map<String, dynamic>) {
-                print('🛒 Venta ${i + 1} (EMPRESA FILTRADA):');
-                print('    - token_venta: ${venta}');
-                print('    - token_venta: ${venta['token_venta']}');
-                print('    - fecha_venta: ${venta['fecha_venta']}');
-                print('    - monto_venta: ${venta['monto_venta']}');
-                print('    - estado_venta: ${venta['estado_venta']}');
-
-                final vendedor = venta['vendedor'];
-                if (vendedor is Map<String, dynamic>) {
-                  print('    - vendedor: ${vendedor['nombre_comercio_vendedor']}');
-                }
-              }
+            if (ventasFiltradas.isEmpty) {
+              print('ℹ️ No hay ventas para la empresa seleccionada');
+              setState(() {
+                _errorMessage = 'No hay compras registradas para esta empresa';
+              });
             }
 
           } else {
@@ -302,6 +483,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             _errorMessage = responseData['error']?.toString() ?? 'Error al cargar el historial';
           });
         }
+      } else if (response.statusCode == 401) {
+        // ✅ SESIÓN EXPIRADA POR STATUS 401
+        print('🔐 Sesión expirada (401 Unauthorized)');
+        mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
+        reiniciarAplicacion(context);
+        return;
       } else {
         print('❌ Error HTTP: ${response.statusCode}');
         setState(() {
@@ -323,25 +510,27 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
-  // ✅ NUEVO MÉTODO: ENCONTRAR LA EMPRESA ASOCIADA A UNA VENTA
   Map<String, dynamic>? _findEmpresaForVenta(Map<String, dynamic> venta, List<dynamic> empresasVentas) {
-    final tokenVenta = venta['token_venta']?.toString();
+    try {
+      final tokenVenta = venta['token_venta']?.toString();
 
-    for (final empVentas in empresasVentas) {
-      if (empVentas is Map<String, dynamic>) {
-        final empresa = empVentas['empresa'];
-        final ventas = empVentas['ventas'] ?? [];
+      for (final empVentas in empresasVentas) {
+        if (empVentas is Map<String, dynamic>) {
+          final empresa = empVentas['empresa'];
+          final ventas = empVentas['ventas'] ?? [];
 
-        // Verificar si esta venta pertenece a esta empresa
-        for (final v in ventas) {
-          if (v is Map<String, dynamic>) {
-            final tokenV = v['token_venta']?.toString();
-            if (tokenV == tokenVenta) {
-              return empresa is Map<String, dynamic> ? empresa : null;
+          for (final v in ventas) {
+            if (v is Map<String, dynamic>) {
+              final tokenV = v['token_venta']?.toString();
+              if (tokenV == tokenVenta) {
+                return empresa is Map<String, dynamic> ? empresa : null;
+              }
             }
           }
         }
       }
+    } catch (e) {
+      print('❌ Error en _findEmpresaForVenta: $e');
     }
     return null;
   }
@@ -350,8 +539,24 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     try {
       final comprador = widget.userData['comprador'];
       if (comprador is Map<String, dynamic>) {
-        return comprador['token_comprador']?.toString() ?? '';
+        final token = comprador['token_comprador']?.toString() ?? '';
+
+        // ✅ VERIFICAR QUE EL TOKEN NO ESTÉ VACÍO
+        if (token.isEmpty) {
+          print('❌ Token comprador está vacío');
+          return '';
+        }
+
+        // ✅ SOLO MOSTRAR PRIMEROS CARACTERES SI EL TOKEN ES SUFICIENTEMENTE LARGO
+        if (token.length >= 10) {
+          print('🔑 Token comprador obtenido: ${token.substring(0, 10)}...');
+        } else {
+          print('🔑 Token comprador obtenido: $token');
+        }
+
+        return token;
       }
+      print('❌ No se encontró comprador en userData');
       return '';
     } catch (e) {
       print('❌ Error obteniendo token_comprador: $e');
@@ -359,7 +564,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
-  // ✅ MÉTODO PARA FORMATEAR MONEDA
   String _formatCurrency(int amount) {
     if (amount == 0) return '\$0';
 
@@ -378,7 +582,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     return '\$$formatted';
   }
 
-  // ✅ MÉTODO PARA FORMATEAR FECHA
   String _formatDate(String dateString) {
     try {
       final date = DateTime.parse(dateString);
@@ -388,38 +591,35 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
-  // ✅ MÉTODO CORREGIDO: COLORES SEGÚN LOS ESTADOS ACTUALIZADOS
   Color _getStatusColor(int estado) {
     switch (estado) {
-      case 0: // Rechazada → Gris
+      case 0:
         return const Color(0xFF757575);
-      case 1: // Aprobada → Azul oscuro #0055B8
+      case 1:
         return const Color(0xFF0055B8);
-      case 2: // Pendiente → Naranja
+      case 2:
         return const Color(0xFFFF9800);
       default:
         return Colors.grey;
     }
   }
 
-  // ✅ MÉTODO CORREGIDO: COLOR DE FONDO SEGÚN ESTADOS ACTUALIZADOS
   Color _getBackgroundColor(int estado) {
     switch (estado) {
-      case 0: // Rechazada
+      case 0:
         return const Color(0xFFF5F5F5);
-      case 1: // Aprobada
+      case 1:
         return const Color(0xFFE8F0FE);
-      case 2: // Pendiente
+      case 2:
         return const Color(0xFFFFF8E1);
       default:
         return Colors.grey.withOpacity(0.05);
     }
   }
 
-  // ✅ MÉTODO CORREGIDO: OBTENER WIDGET DE ESTADO CON ICONOS
   Widget _getSaleStatusWidget(int estado) {
     switch (estado) {
-      case 0: // Rechazada
+      case 0:
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -439,7 +639,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             ),
           ],
         );
-      case 1: // Aprobada
+      case 1:
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -459,7 +659,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             ),
           ],
         );
-      case 2: // Pendiente
+      case 2:
         return Text(
           'Pendiente',
           style: TextStyle(
@@ -480,16 +680,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
-  // ✅ MÉTODO CORREGIDO: OBTENER NOMBRE DEL COMPRADOR DESDE LA VENTA
   String _getCompradorName(Map<String, dynamic> sale) {
     try {
-      // Primero intentar obtener el nombre_comprador directamente de la venta
       final nombreComprador = sale['comprador']['nombre_comprador']?.toString();
       if (nombreComprador != null && nombreComprador.isNotEmpty) {
         return nombreComprador;
       }
 
-      // Si no está en la venta, buscar en el objeto comprador dentro de la venta
       final comprador = sale['comprador'];
       if (comprador is Map<String, dynamic>) {
         final nombre = comprador['nombre_comprador']?.toString();
@@ -498,7 +695,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         }
       }
 
-      // Si no hay nombre en la venta, usar el nombre del comprador logueado como fallback
       final compradorLogueado = widget.userData['comprador'];
       if (compradorLogueado is Map<String, dynamic>) {
         final nombreLogueado = compradorLogueado['nombre_comprador']?.toString();
@@ -516,12 +712,26 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('🏗️ SalesHistoryScreen build - isLoading: $_isLoading, error: $_errorMessage');
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: _isLoading
-          ? const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF0055B8),
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: const Color(0xFF0055B8),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Cargando historial de compras...',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
         ),
       )
           : _errorMessage.isNotEmpty && _filteredSales.isEmpty
@@ -564,7 +774,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  // ✅ WIDGET PARA CHIPS DE FILTRO
   Widget _buildFilterChip(String label, String value) {
     return ChoiceChip(
       label: Text(label),
@@ -619,7 +828,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ✅ NOMBRE DEL COMERCIO Y ESTADO
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -649,8 +857,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-
-              // ✅ INFORMACIÓN DEL COMPRADOR
               Row(
                 children: [
                   Icon(
@@ -673,8 +879,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-
-              // ✅ MONTO Y FECHA
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

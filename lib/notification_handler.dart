@@ -12,124 +12,312 @@ class NotificationHandler {
   static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-  // ✅ SEPARAR CONTROLADORES PARA SNACKBAR Y MATERIALBANNER
   static ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _currentSnackBar;
   static ScaffoldFeatureController<MaterialBanner, MaterialBannerClosedReason>? _currentMaterialBanner;
   static OverlayEntry? _notificationOverlay;
-  static RemoteMessage? _currentMessage; // ✅ GUARDAR EL MENSAJE ACTUAL
+  static RemoteMessage? _currentMessage;
 
-  // ✅ TIMER INDEPENDIENTE PARA CADA NOTIFICACIÓN
   static Timer? _currentNotificationTimer;
-
-  // ✅ COLOR AZUL OSCURO (IGUAL QUE EN PROFILE SCREEN)
   static const Color _blueDarkColor = Color(0xFF0055B8);
-
-  // ✅ COLOR DE FONDO DE TARJETAS APROBADAS (IGUAL QUE EN PROFILE SCREEN)
   static const Color _approvedCardBackground = Color(0xFFE8F0FE);
+  static OverlayEntry? _globalNotificationOverlay;
 
-  // ✅ INICIALIZAR CON EL navigatorKey DEL MAIN
+  // Variable para almacenar token de dispositivo
+  static String? _deviceToken;
+
   static void initializeNotifications() {
-    print('🔔 Inicializando notificaciones...');
+    print('🔔 [NotificationHandler] Inicializando notificaciones...');
 
-    // Configurar notificaciones en primer plano
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('📱 Notificación en primer plano recibida!');
-      print('📋 Título: ${message.notification?.title}');
-      print('📋 Cuerpo: ${message.notification?.body}');
-      print('📋 Datos: ${message.data}');
-
-      // ✅ GUARDAR EL MENSAJE ACTUAL
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      print('\n📱 [NotificationHandler] Notificación recibida en primer plano');
+      _logNotificationData(message);
       _currentMessage = message;
 
-      // ✅ MOSTRAR NOTIFICACIÓN EN PARTE SUPERIOR
-      _showForegroundNotification(message);
+      // Llamar a la API AbrirNotificacion y verificar si se debe abrir
+      final bool shouldOpen = await _callAbrirNotificacionAPI(message);
+
+      if (shouldOpen) {
+        _showForegroundNotification(message);
+      } else {
+        print('❌ [NotificationHandler] Notificación no debe abrirse (success: false o sesion_iniciada: false)');
+        _closeCurrentNotifications();
+      }
     });
 
-    // Configurar cuando se abre la notificación (app en segundo plano/cerrada)
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('🚀 Notificación abierta desde segundo plano/cerrada');
-      print('📋 Título: ${message.notification?.title}');
-      print('📋 Cuerpo: ${message.notification?.body}');
-      print('📋 Datos: ${message.data}');
-
-      // ✅ GUARDAR EL MENSAJE ACTUAL
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+      print('\n🚀 [NotificationHandler] Notificación abierta desde segundo plano');
+      _logNotificationData(message);
       _currentMessage = message;
 
-      // ✅ CERRAR NOTIFICACIONES SI ESTÁN ABIERTAS
-      _closeCurrentNotifications();
-      _navigateToNotificationDetail(message);
+      // Llamar a la API AbrirNotificacion y verificar si se debe abrir
+      final bool shouldOpen = await _callAbrirNotificacionAPI(message);
+
+      if (shouldOpen) {
+        _closeCurrentNotifications();
+        _navigateToNotificationDetail(message);
+      } else {
+        print('❌ [NotificationHandler] Notificación no debe abrirse desde segundo plano (success: false o sesion_iniciada: false)');
+        _closeCurrentNotifications();
+      }
     });
 
-    // Manejar notificación cuando la app está totalmente cerrada
     _handleTerminatedNotification();
-
-    // Solicitar permisos
     _requestPermissions();
   }
 
-  // ✅ MÉTODO PARA CERRAR TODAS LAS NOTIFICACIONES ACTUALES
+  // MÉTODO MODIFICADO: Ahora incluye token_comprador y token_dispositivo
+  static Future<bool> _callAbrirNotificacionAPI(RemoteMessage message) async {
+    print('\n📡 [NotificationHandler] ========== LLAMANDO API ABRIR NOTIFICACIÓN ==========');
+
+    try {
+      // Obtener token del dispositivo FCM si no está almacenado
+      if (_deviceToken == null) {
+        _deviceToken = await _firebaseMessaging.getToken();
+        print('📱 [NotificationHandler] Token FCM obtenido: $_deviceToken');
+      }
+
+      // Extraer fecha del payload y formatear correctamente
+      final fechaRaw = message.data['fecha'] ?? '';
+      String fechaFormateada = '';
+
+      if (fechaRaw.isNotEmpty) {
+        try {
+          // Intentar parsear la fecha ISO (2026-01-09T05:10:29.706477)
+          final fechaIso = DateTime.tryParse(fechaRaw);
+          if (fechaIso != null) {
+            fechaFormateada = '${fechaIso.day.toString().padLeft(2, '0')}-'
+                '${fechaIso.month.toString().padLeft(2, '0')}-'
+                '${fechaIso.year} '
+                '${fechaIso.hour.toString().padLeft(2, '0')}:'
+                '${fechaIso.minute.toString().padLeft(2, '0')}:'
+                '${fechaIso.second.toString().padLeft(2, '0')}';
+            print('✅ [NotificationHandler] Fecha parseada y formateada correctamente');
+            print('   • Original: $fechaRaw');
+            print('   • Formateada: $fechaFormateada');
+          } else {
+            print('⚠️ [NotificationHandler] No se pudo parsear la fecha: $fechaRaw');
+          }
+        } catch (e) {
+          print('⚠️ [NotificationHandler] Error parseando fecha: $e');
+        }
+      } else {
+        print('⚠️ [NotificationHandler] No hay fecha en el payload, usando hora actual');
+        final now = DateTime.now();
+        fechaFormateada = '${now.day.toString().padLeft(2, '0')}-'
+            '${now.month.toString().padLeft(2, '0')}-'
+            '${now.year} '
+            '${now.hour.toString().padLeft(2, '0')}:'
+            '${now.minute.toString().padLeft(2, '0')}:'
+            '${now.second.toString().padLeft(2, '0')}';
+      }
+
+      // Obtener token_comprador del payload
+      final tokenComprador = message.data['token_comprador'] ?? '';
+      final maximoTiempo = '15';
+
+      print('📊 [NotificationHandler] Datos para API AbrirNotificacion:');
+      print('   • fecha_envio_notificacion: $fechaFormateada');
+      print('   • maximo_tiempo: $maximoTiempo');
+      print('   • token_comprador: $tokenComprador');
+      print('   • token_dispositivo: $_deviceToken');
+
+      // Validar que tenemos los datos necesarios
+      if (tokenComprador.isEmpty) {
+        print('❌ [NotificationHandler] token_comprador está vacío en el payload');
+        print('📡 [NotificationHandler] ========== FIN LLAMADA API ==========\n');
+        return false;
+      }
+
+      if (_deviceToken == null || _deviceToken!.isEmpty) {
+        print('❌ [NotificationHandler] No se pudo obtener token_dispositivo');
+        print('📡 [NotificationHandler] ========== FIN LLAMADA API ==========\n');
+        return false;
+      }
+
+      // Preparar el body de la petición con los nuevos parámetros
+      final Map<String, dynamic> requestBody = {
+        "fecha_envio_notificacion": fechaFormateada,
+        "maximo_tiempo": maximoTiempo,
+        "token_comprador": tokenComprador,
+        "token_dispositivo": _deviceToken!,
+      };
+
+      print('📤 [NotificationHandler] Enviando petición a API:');
+      print('   • URL: ${GlobalVariables.baseUrl}/AbrirNotificacion/api/v1/');
+      print('   • Body: ${json.encode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse('${GlobalVariables.baseUrl}/AbrirNotificacion/api/v1/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'api-key': GlobalVariables.apiKey,
+        },
+        body: json.encode(requestBody),
+      ).timeout(const Duration(seconds: 10));
+
+      print('📥 [NotificationHandler] RESPUESTA API ABRIR NOTIFICACIÓN:');
+      print('   • Status Code: ${response.statusCode}');
+      print('   • Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        print('✅ [NotificationHandler] API AbrirNotificacion llamada exitosamente');
+
+        try {
+          final responseData = json.decode(response.body);
+          print('📊 [NotificationHandler] Respuesta JSON parseada:');
+          responseData.forEach((key, value) {
+            print('   • $key: $value (tipo: ${value.runtimeType})');
+          });
+
+          // VERIFICAR SI SE DEBE ABRIR LA NOTIFICACIÓN - NUEVA LÓGICA
+          final bool success = responseData['success'] == true;
+          final bool sesionIniciada = responseData['sesion_iniciada'] == true;
+          final bool abrirNotificacion = responseData['abrir_notificacion'] == true;
+
+          print('🔍 [NotificationHandler] Validaciones:');
+          print('json: $responseData');
+          print('   • success: $success');
+          print('   • sesion_iniciada: $sesionIniciada');
+          print('   • abrir_notificacion: $abrirNotificacion');
+
+          // NUEVA VALIDACIÓN: No abrir si success es false O sesion_iniciada es false
+          if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
+            print('❌ [NotificationHandler] No se debe abrir notificación porque:');
+            if (!success) print('   • success es false');
+            if (!sesionIniciada) print('   • sesion_iniciada es false');
+            print('📡 [NotificationHandler] ========== FIN LLAMADA API ==========\n');
+            return false;
+          }
+
+          // Si pasa las validaciones anteriores, usar abrir_notificacion
+          print('🔍 [NotificationHandler] ¿Debe abrirse la notificación? $abrirNotificacion');
+
+          if (responseData.containsKey('diferencia_segundos')) {
+            final diferenciaSegundos = responseData['diferencia_segundos'];
+            final maximoSegundos = responseData['maximo_segundos'] ?? 15.0;
+            print('⏰ [NotificationHandler] Tiempo transcurrido: $diferenciaSegundos segundos');
+            print('⏰ [NotificationHandler] Máximo permitido: $maximoSegundos segundos');
+
+            if (diferenciaSegundos is num && maximoSegundos is num) {
+              final tiempoRestante = maximoSegundos - diferenciaSegundos;
+              if (tiempoRestante > 0) {
+                print('⏰ [NotificationHandler] Tiempo restante: $tiempoRestante segundos');
+              } else {
+                print('⏰ [NotificationHandler] Tiempo agotado');
+              }
+            }
+          }
+
+          // Verificar auditoria
+          if (responseData.containsKey('auditoria')) {
+            final auditoria = responseData['auditoria'];
+            final codigoError = auditoria['codigo_error']?.toString() ?? '';
+            final glosaError = auditoria['glosa_error']?.toString() ?? '';
+            print('📋 [NotificationHandler] Auditoria:');
+            print('   • Código error: $codigoError');
+            print('   • Glosa error: $glosaError');
+          }
+
+          // RETORNAR SI SE DEBE ABRIR O NO
+          print('📡 [NotificationHandler] ========== FIN LLAMADA API ==========\n');
+          return abrirNotificacion;
+
+        } catch (e) {
+          print('⚠️ [NotificationHandler] Error parseando respuesta JSON: $e');
+          print('   • Body crudo: ${response.body}');
+          // Por defecto, si hay error en el parseo, no abrimos
+          print('📡 [NotificationHandler] ========== FIN LLAMADA API ==========\n');
+          return false;
+        }
+      } else {
+        print('❌ [NotificationHandler] Error en API AbrirNotificacion: ${response.statusCode}');
+        print('   • Error body: ${response.body}');
+        // Por defecto, si hay error HTTP, no abrimos
+        print('📡 [NotificationHandler] ========== FIN LLAMADA API ==========\n');
+        return false;
+      }
+
+    } catch (e) {
+      print('❌ [NotificationHandler] Error llamando API AbrirNotificacion: $e');
+      print('   • Error type: ${e.runtimeType}');
+      // Por defecto, si hay excepción, no abrimos
+      print('📡 [NotificationHandler] ========== FIN LLAMADA API ==========\n');
+      return false;
+    }
+  }
+
+  static void _logNotificationData(RemoteMessage message) {
+    print('📋 Datos completos de la notificación:');
+    print('   • Título: ${message.notification?.title}');
+    print('   • Cuerpo: ${message.notification?.body}');
+    print('   • Datos (payload):');
+    message.data.forEach((key, value) {
+      print('     - $key: $value (tipo: ${value.runtimeType})');
+    });
+    print('   • Estructura JSON: ${json.encode(message.data)}');
+  }
+
   static void _closeCurrentNotifications() {
-    // ✅ CANCELAR TIMER ACTUAL
     if (_currentNotificationTimer != null && _currentNotificationTimer!.isActive) {
       _currentNotificationTimer!.cancel();
       _currentNotificationTimer = null;
-      print('✅ Timer de notificación cancelado');
+      print('⏰ [NotificationHandler] Timer cancelado');
     }
 
     if (_currentMaterialBanner != null) {
       try {
         _currentMaterialBanner!.close();
         _currentMaterialBanner = null;
-        print('✅ MaterialBanner cerrado manualmente');
-      } catch (e) {
-        print('❌ Error cerrando MaterialBanner: $e');
-      }
+      } catch (e) {}
     }
 
     if (_currentSnackBar != null) {
       try {
         _currentSnackBar!.close();
         _currentSnackBar = null;
-        print('✅ SnackBar cerrado manualmente');
-      } catch (e) {
-        print('❌ Error cerrando SnackBar: $e');
-      }
+      } catch (e) {}
     }
 
     if (_notificationOverlay != null) {
       try {
         _notificationOverlay!.remove();
         _notificationOverlay = null;
-        print('✅ Overlay cerrado manualmente');
-      } catch (e) {
-        print('❌ Error cerrando Overlay: $e');
-      }
+      } catch (e) {}
     }
 
-    _currentMessage = null; // ✅ LIMPIAR EL MENSAJE ACTUAL
+    if (_globalNotificationOverlay != null) {
+      try {
+        _globalNotificationOverlay!.remove();
+        _globalNotificationOverlay = null;
+      } catch (e) {}
+    }
+
+    _currentMessage = null;
   }
 
-  // ✅ MÉTODO PARA RECHAZAR COMPRA AL CERRAR LA NOTIFICACIÓN
   static Future<void> _rejectCurrentCompra() async {
     if (_currentMessage == null) {
-      print('❌ No hay mensaje actual para rechazar');
+      print('❌ [NotificationHandler] No hay mensaje actual para rechazar');
       return;
     }
 
     final tokenVenta = _currentMessage!.data['token_venta'];
     if (tokenVenta == null) {
-      print('❌ No hay token_venta en el mensaje actual');
+      print('❌ [NotificationHandler] No hay token_venta en el mensaje');
       return;
     }
 
-    print('❌ RECHAZANDO COMPRA AL CERRAR NOTIFICACIÓN');
-    print('📋 Token venta: $tokenVenta');
+    print('🔄 [NotificationHandler] Rechazando compra al cerrar notificación');
+    print('   • Token venta: $tokenVenta');
 
     try {
       final Map<String, dynamic> requestBody = {
         "token_venta": tokenVenta,
         "descripcion": "Compra cancelada al cerrar la notificación",
       };
+
+      print('📤 [NotificationHandler] Enviando rechazo: ${json.encode(requestBody)}');
 
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/RechazarCompra/api/v1/'),
@@ -141,16 +329,17 @@ class NotificationHandler {
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 10));
 
-      print('📥 Response rechazo por cerrar notificación - Status: ${response.statusCode}');
+      print('📥 [NotificationHandler] Respuesta rechazo - Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        print('✅ Compra rechazada exitosamente al cerrar notificación');
+        print('✅ [NotificationHandler] Compra rechazada exitosamente');
       } else {
-        print('❌ Error al rechazar compra: ${response.statusCode}');
+        print('❌ [NotificationHandler] Error al rechazar: ${response.statusCode}');
+        print('   • Body: ${response.body}');
       }
 
     } catch (e) {
-      print('❌ Error en _rejectCurrentCompra: $e');
+      print('❌ [NotificationHandler] Error en _rejectCurrentCompra: $e');
     }
   }
 
@@ -162,95 +351,308 @@ class NotificationHandler {
         sound: true,
       );
 
-      print('📋 Permisos de notificación: ${settings.authorizationStatus}');
+      print('📋 [NotificationHandler] Permisos: ${settings.authorizationStatus}');
 
-      // Obtener token FCM
-      String? token = await _firebaseMessaging.getToken();
-      print('🔑 Token FCM: $token');
+      // Obtener y almacenar token FCM al solicitar permisos
+      _deviceToken = await _firebaseMessaging.getToken();
+      print('🔑 [NotificationHandler] Token FCM almacenado: $_deviceToken');
 
     } catch (e) {
-      print('❌ Error solicitando permisos: $e');
+      print('❌ [NotificationHandler] Error solicitando permisos: $e');
     }
   }
 
-  // ✅ MÉTODO PRINCIPAL: MOSTRAR NOTIFICACIÓN EN PARTE SUPERIOR
   static void _showForegroundNotification(RemoteMessage message) {
-    print('🎬 Mostrando notificación en primer plano...');
+    print('\n🎬 [NotificationHandler] Mostrando notificación en primer plano...');
 
     if (navigatorKey.currentContext != null) {
-      print('✅ Contexto disponible para notificación');
+      print('✅ [NotificationHandler] Contexto disponible');
 
-      // ✅ CERRAR NOTIFICACIONES ANTERIORES (INCLUYENDO TIMERS)
       _closeCurrentNotifications();
-
-      // ✅ GUARDAR EL MENSAJE ACTUAL
       _currentMessage = message;
-
-      // ✅ USAR OVERLAY PERSONALIZADO (RECOMENDADO)
-      _showCustomTopNotification(message);
+      _forceCloseModals();
+      _showDirectOverlayNotification(message);
 
     } else {
-      print('❌ No hay contexto disponible para notificación');
-      // Si no hay contexto, navegar directamente
+      print('❌ [NotificationHandler] No hay contexto disponible, navegando directamente');
       _navigateToNotificationDetail(message);
     }
   }
 
-  // ✅ MÉTODO CON OVERLAY PERSONALIZADO EN PARTE SUPERIOR
-  static void _showCustomTopNotification(RemoteMessage message) {
-    print('🎬 Mostrando notificación personalizada en parte superior...');
-
+  static void _forceCloseModals() {
     if (navigatorKey.currentContext != null) {
       try {
-        final overlay = Overlay.of(navigatorKey.currentContext!);
-
-        // Crear el overlay entry
-        _notificationOverlay = OverlayEntry(
-          builder: (context) => _NotificationOverlayContent(
-            message: message,
-            onTap: () {
-              print('👆 Notificación personalizada presionada');
-              _closeCurrentNotifications(); // ✅ CANCELAR TIMER DE NOTIFICACIÓN
-              _navigateToNotificationDetail(message);
-            },
-            onClose: () {
-              print('❌ Botón X presionado - Rechazando compra');
-              _rejectCurrentCompra();
-              _closeCurrentNotifications();
-            },
-          ),
-        );
-
-        // Insertar el overlay
-        overlay.insert(_notificationOverlay!);
-        print('✅ Notificación overlay mostrada exitosamente en parte superior');
-
-        // ✅ INICIAR TIMER PARA ESTA NOTIFICACIÓN (10 SEGUNDOS)
-        _startNotificationTimer();
-
+        Navigator.of(navigatorKey.currentContext!, rootNavigator: true).popUntil((route) => route.isFirst);
+        print('✅ [NotificationHandler] Modales cerrados');
       } catch (e) {
-        print('❌ Error mostrando overlay: $e');
-        // Si falla el overlay, intentar con MaterialBanner
-        _showMaterialBannerNotification(message);
+        print('⚠️ [NotificationHandler] Error cerrando modales: $e');
       }
     }
   }
 
-  // ✅ MÉTODO PARA INICIAR EL TIMER (10 SEGUNDOS)
+  static void _showDirectOverlayNotification(RemoteMessage message) {
+    print('🎬 [NotificationHandler] Mostrando overlay directo...');
+
+    // Intentar con un delay para asegurar que el contexto esté listo
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (navigatorKey.currentContext != null) {
+        try {
+          // Obtener el overlay state del contexto de navegación
+          final overlayState = Navigator.of(navigatorKey.currentContext!).overlay;
+
+          if (overlayState == null) {
+            print('❌ [NotificationHandler] No se pudo obtener overlayState');
+            _showSimpleNotification(message);
+            return;
+          }
+
+          _globalNotificationOverlay = OverlayEntry(
+            builder: (context) => Positioned(
+              top: MediaQuery.of(context).viewPadding.top + 10,
+              left: 10,
+              right: 10,
+              child: Material(
+                color: Colors.transparent,
+                elevation: 1000,
+                child: _DirectNotificationWidget(
+                  message: message,
+                  onTap: () {
+                    print('👆 [NotificationHandler] Notificación presionada');
+                    _closeCurrentNotifications();
+                    _navigateToNotificationDetail(message);
+                  },
+                  onClose: () {
+                    print('❌ [NotificationHandler] Botón X presionado');
+                    _rejectCurrentCompra();
+                    _closeCurrentNotifications();
+                  },
+                ),
+              ),
+            ),
+          );
+
+          overlayState.insert(_globalNotificationOverlay!);
+          print('✅ [NotificationHandler] Overlay mostrado exitosamente');
+          _startNotificationTimer();
+
+        } catch (e) {
+          print('❌ [NotificationHandler] Error mostrando overlay: $e');
+          _showSimpleNotification(message);
+        }
+      } else {
+        print('❌ [NotificationHandler] No hay contexto para mostrar overlay');
+        _showSimpleNotification(message);
+      }
+    });
+  }
+
+  static void _showSimpleNotification(RemoteMessage message) {
+    print('🎬 [NotificationHandler] Mostrando notificación simple...');
+
+    // Crear un modal simple que se parezca a la notificación
+    if (navigatorKey.currentContext != null) {
+      showDialog(
+        context: navigatorKey.currentContext!,
+        barrierDismissible: false,
+        barrierColor: Colors.black.withOpacity(0.3),
+        builder: (context) {
+          return _NotificationDialog(
+            message: message,
+            onTap: () {
+              Navigator.of(context).pop();
+              _closeCurrentNotifications();
+              _navigateToNotificationDetail(message);
+            },
+            onClose: () {
+              Navigator.of(context).pop();
+              _rejectCurrentCompra();
+              _closeCurrentNotifications();
+            },
+          );
+        },
+      );
+
+      _startNotificationTimer();
+    } else {
+      _navigateToNotificationDetail(message);
+    }
+  }
+
+  static Widget _DirectNotificationWidget({
+    required RemoteMessage message,
+    required VoidCallback onTap,
+    required VoidCallback onClose,
+  }) {
+    final comercio = message.data['comercio'] ?? 'Comercio';
+    final monto = message.data['monto'] ?? '0';
+    final empresa = message.data['nombre_empresa'] ?? 'Empresa';
+
+    final montoFormateado = _formatCurrency(monto);
+    final titulo = message.notification?.title ?? 'NUEVA COMPRA';
+    final cuerpo = 'Compra de $empresa en $comercio por $montoFormateado';
+
+    print('📝 [DirectNotificationWidget] Construyendo widget:');
+    print('   • Empresa: $empresa');
+    print('   • Comercio: $comercio');
+    print('   • Monto original: $monto');
+    print('   • Monto formateado: $montoFormateado');
+    print('   • Texto final: $cuerpo');
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 25,
+              spreadRadius: 3,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: _blueDarkColor.withOpacity(0.15),
+              blurRadius: 15,
+              spreadRadius: 1,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: _blueDarkColor.withOpacity(0.08),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _blueDarkColor.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.shopping_cart_checkout,
+                color: _blueDarkColor,
+                size: 22,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    titulo,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: _blueDarkColor,
+                      letterSpacing: 0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  Text(
+                    cuerpo,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade800,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.red.shade300,
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.15),
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: Icon(
+                  Icons.close,
+                  size: 16,
+                  color: Colors.red.shade700,
+                ),
+                onPressed: onClose,
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _formatCurrency(String amount) {
+    try {
+      String cleanAmount = amount.replaceAll(RegExp(r'[^\d]'), '');
+      int value = int.tryParse(cleanAmount) ?? 0;
+
+      if (value == 0) return '\$0';
+
+      String amountStr = value.toString();
+      String formatted = '';
+      int count = 0;
+
+      for (int i = amountStr.length - 1; i >= 0; i--) {
+        if (count > 0 && count % 3 == 0) {
+          formatted = '.$formatted';
+        }
+        formatted = amountStr[i] + formatted;
+        count++;
+      }
+
+      return '\$$formatted';
+    } catch (e) {
+      print('⚠️ [NotificationHandler] Error formateando moneda "$amount": $e');
+      return '\$$amount';
+    }
+  }
+
   static void _startNotificationTimer() {
-    const totalSeconds = 10; // ✅ CAMBIADO A 10 SEGUNDOS
+    const totalSeconds = 10;
     int elapsedSeconds = 0;
 
-    // ✅ CANCELAR TIMER ANTERIOR SI EXISTE
     if (_currentNotificationTimer != null && _currentNotificationTimer!.isActive) {
       _currentNotificationTimer!.cancel();
     }
+
+    print('⏰ [NotificationHandler] Iniciando timer de 10 segundos');
 
     _currentNotificationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       elapsedSeconds++;
 
       if (elapsedSeconds >= totalSeconds) {
-        print('⏰ Tiempo agotado (10s) - Rechazando compra automáticamente');
+        print('⏰ [NotificationHandler] Tiempo agotado - Rechazo automático');
         _rejectCurrentCompra();
         _closeCurrentNotifications();
         timer.cancel();
@@ -258,106 +660,8 @@ class NotificationHandler {
     });
   }
 
-  // ✅ MÉTODO ALTERNATIVO: MATERIAL BANNER
-  static void _showMaterialBannerNotification(RemoteMessage message) {
-    print('🎬 Intentando con MaterialBanner...');
-
-    try {
-      _currentMaterialBanner = ScaffoldMessenger.of(navigatorKey.currentContext!).showMaterialBanner(
-        MaterialBanner(
-          content: GestureDetector(
-            onTap: () {
-              print('👆 MaterialBanner presionado');
-              _closeCurrentNotifications(); // ✅ CANCELAR TIMER DE NOTIFICACIÓN
-              _navigateToNotificationDetail(message);
-            },
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: _blueDarkColor.withOpacity(0.1), // ✅ AZUL OSCURO CON OPACIDAD
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.shopping_cart,
-                    color: _blueDarkColor, // ✅ CAMBIADO A AZUL OSCURO
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        message.notification?.title ?? 'Nueva compra',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: _blueDarkColor, // ✅ TÍTULO EN AZUL OSCURO
-                        ),
-                      ),
-                      Text(
-                        message.notification?.body ?? 'Toca para ver detalles',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // ✅ INDICADOR DE TIEMPO RESTANTE SIMPLE (SIN ValueNotifier)
-                      Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          backgroundColor: Colors.white,
-          elevation: 6,
-          padding: const EdgeInsets.all(16),
-          leadingPadding: EdgeInsets.zero,
-          actions: [
-            // ✅ BOTÓN X QUE RECHAZA LA COMPRA
-            IconButton(
-              icon: Icon(
-                Icons.close,
-                size: 20,
-                color: Colors.red.shade700,
-              ),
-              onPressed: () {
-                print('❌ Botón X presionado - Rechazando compra');
-                _rejectCurrentCompra();
-                _closeCurrentNotifications();
-              },
-            ),
-          ],
-        ),
-      );
-
-      print('✅ MaterialBanner mostrado exitosamente');
-
-      // ✅ INICIAR TIMER PARA ESTA NOTIFICACIÓN (10 SEGUNDOS)
-      _startNotificationTimer();
-
-    } catch (e) {
-      print('❌ Error mostrando MaterialBanner: $e');
-      // Si todo falla, navegar directamente
-      _navigateToNotificationDetail(message);
-    }
-  }
-
   static void _navigateToNotificationDetail(RemoteMessage message) {
-    print('🧭 Navegando a detalle de notificación...');
-    print('🔍 NavigatorKey estado: ${navigatorKey.currentState}');
+    print('🧭 [NotificationHandler] Navegando a detalle...');
 
     if (navigatorKey.currentState != null) {
       try {
@@ -370,32 +674,227 @@ class NotificationHandler {
             ),
           ),
         );
-        print('✅ Navegación exitosa a NotificationDetailScreen');
+        print('✅ [NotificationHandler] Navegación exitosa');
       } catch (e) {
-        print('❌ Error en navegación: $e');
+        print('❌ [NotificationHandler] Error en navegación: $e');
       }
     } else {
-      print('❌ No se puede navegar: navigatorKey.currentState es null');
+      print('❌ [NotificationHandler] navigatorKey.currentState es null');
     }
   }
 
   static Future<void> _handleTerminatedNotification() async {
-    print('🔍 Verificando notificaciones de app terminada...');
+    print('🔍 [NotificationHandler] Verificando notificaciones de app terminada...');
+
     RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
     if (initialMessage != null) {
-      print('🔓 App abierta desde notificación (estado terminado)');
-      print('📋 Título: ${initialMessage.notification?.title}');
-      print('📋 Cuerpo: ${initialMessage.notification?.body}');
-      print('📋 Datos: ${initialMessage.data}');
-      await Future.delayed(const Duration(milliseconds: 2000));
-      _navigateToNotificationDetail(initialMessage);
+      print('🔓 [NotificationHandler] App abierta desde notificación (estado terminado)');
+      _logNotificationData(initialMessage);
+
+      // Verificar si se debe abrir la notificación
+      final bool shouldOpen = await _callAbrirNotificacionAPI(initialMessage);
+
+      if (shouldOpen) {
+        await Future.delayed(const Duration(milliseconds: 2000));
+        _navigateToNotificationDetail(initialMessage);
+      } else {
+        print('❌ [NotificationHandler] Notificación de app terminada no debe abrirse (success: false o sesion_iniciada: false)');
+      }
     } else {
-      print('📭 No hay notificaciones de app terminada');
+      print('📭 [NotificationHandler] No hay notificaciones de app terminada');
     }
   }
 }
 
-// ✅ WIDGET SEPARADO PARA EL OVERLAY DE NOTIFICACIÓN (EVITA PROBLEMAS DE ValueNotifier)
+class _NotificationDialog extends StatefulWidget {
+  final RemoteMessage message;
+  final VoidCallback onTap;
+  final VoidCallback onClose;
+
+  const _NotificationDialog({
+    required this.message,
+    required this.onTap,
+    required this.onClose,
+  });
+
+  @override
+  State<_NotificationDialog> createState() => _NotificationDialogState();
+}
+
+class _NotificationDialogState extends State<_NotificationDialog> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  Timer? _timer;
+  int _elapsedSeconds = 0;
+  final int _totalSeconds = 10;
+  final Color _blueDarkColor = const Color(0xFF0055B8);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: _totalSeconds),
+    );
+    _controller.forward();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _elapsedSeconds++;
+      });
+      if (_elapsedSeconds >= _totalSeconds) {
+        timer.cancel();
+        widget.onClose();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _formatCurrency(String amount) {
+    try {
+      String cleanAmount = amount.replaceAll(RegExp(r'[^\d]'), '');
+      int value = int.tryParse(cleanAmount) ?? 0;
+      if (value == 0) return '\$0';
+      String amountStr = value.toString();
+      String formatted = '';
+      int count = 0;
+      for (int i = amountStr.length - 1; i >= 0; i--) {
+        if (count > 0 && count % 3 == 0) {
+          formatted = '.$formatted';
+        }
+        formatted = amountStr[i] + formatted;
+        count++;
+      }
+      return '\$$formatted';
+    } catch (e) {
+      return '\$$amount';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final comercio = widget.message.data['comercio'] ?? 'Comercio';
+    final monto = widget.message.data['monto'] ?? '0';
+    final empresa = widget.message.data['nombre_empresa'] ?? 'Empresa';
+    final montoFormateado = _formatCurrency(monto);
+    final cuerpo = 'Compra de $empresa en $comercio por $montoFormateado';
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 25,
+                spreadRadius: 3,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: _blueDarkColor.withOpacity(0.15),
+                blurRadius: 15,
+                spreadRadius: 1,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _blueDarkColor.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _blueDarkColor.withOpacity(0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  Icons.shopping_cart_checkout,
+                  color: _blueDarkColor,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.message.notification?.title ?? 'NUEVA COMPRA',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: _blueDarkColor,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    Text(
+                      cuerpo,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade800,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.red.shade300,
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.15),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.close,
+                    size: 16,
+                    color: Colors.red.shade700,
+                  ),
+                  onPressed: widget.onClose,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NotificationOverlayContent extends StatefulWidget {
   final RemoteMessage message;
   final VoidCallback onTap;
@@ -413,37 +912,34 @@ class _NotificationOverlayContent extends StatefulWidget {
 
 class _NotificationOverlayContentState extends State<_NotificationOverlayContent> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _progressAnimation;
   Timer? _timer;
   int _elapsedSeconds = 0;
   final int _totalSeconds = 10;
-
-  // ✅ COLOR AZUL OSCURO (IGUAL QUE EN PROFILE SCREEN)
   final Color _blueDarkColor = const Color(0xFF0055B8);
 
   @override
   void initState() {
     super.initState();
+    print('🔄 [_NotificationOverlayContent] initState');
 
     _controller = AnimationController(
       vsync: this,
       duration: Duration(seconds: _totalSeconds),
     );
 
-    _progressAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(_controller);
-
-    // Iniciar animación y timer
     _controller.forward();
     _startTimer();
   }
 
   void _startTimer() {
+    print('⏰ [_NotificationOverlayContent] Iniciando timer');
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         _elapsedSeconds++;
       });
 
       if (_elapsedSeconds >= _totalSeconds) {
+        print('⏰ [_NotificationOverlayContent] Timer completado');
         timer.cancel();
       }
     });
@@ -453,13 +949,50 @@ class _NotificationOverlayContentState extends State<_NotificationOverlayContent
   void dispose() {
     _timer?.cancel();
     _controller.dispose();
+    print('🗑️ [_NotificationOverlayContent] dispose');
     super.dispose();
+  }
+
+  String _formatCurrency(String amount) {
+    try {
+      String cleanAmount = amount.replaceAll(RegExp(r'[^\d]'), '');
+      int value = int.tryParse(cleanAmount) ?? 0;
+
+      if (value == 0) return '\$0';
+
+      String amountStr = value.toString();
+      String formatted = '';
+      int count = 0;
+
+      for (int i = amountStr.length - 1; i >= 0; i--) {
+        if (count > 0 && count % 3 == 0) {
+          formatted = '.$formatted';
+        }
+        formatted = amountStr[i] + formatted;
+        count++;
+      }
+
+      return '\$$formatted';
+    } catch (e) {
+      return '\$$amount';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final comercio = widget.message.data['comercio'] ?? 'Comercio';
+    final monto = widget.message.data['monto'] ?? '0';
+    final empresa = widget.message.data['nombre_empresa'] ?? 'Empresa';
+    final montoFormateado = _formatCurrency(monto);
+    final cuerpo = 'Compra de $empresa en $comercio por $montoFormateado';
+
+    print('🎨 [_NotificationOverlayContent] Construyendo widget con:');
+    print('   • Empresa: $empresa');
+    print('   • Comercio: $comercio');
+    print('   • Monto: $montoFormateado');
+
     return Positioned(
-      top: MediaQuery.of(context).padding.top + 10,
+      top: MediaQuery.of(context).viewPadding.top + 10,
       left: 10,
       right: 10,
       child: Material(
@@ -467,101 +1000,98 @@ class _NotificationOverlayContentState extends State<_NotificationOverlayContent
         child: GestureDetector(
           onTap: widget.onTap,
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withOpacity(0.4),
+                  blurRadius: 25,
+                  spreadRadius: 3,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: _blueDarkColor.withOpacity(0.15),
                   blurRadius: 15,
-                  offset: const Offset(0, 6),
+                  spreadRadius: 1,
+                  offset: const Offset(0, 3),
                 ),
               ],
-              border: Border.all(
-                color: _blueDarkColor, // ✅ CAMBIADO A AZUL OSCURO
-                width: 2.5,
-              ),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: _blueDarkColor.withOpacity(0.1), // ✅ AZUL OSCURO CON OPACIDAD
+                    color: _blueDarkColor.withOpacity(0.08),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _blueDarkColor.withOpacity(0.3),
+                      width: 1.5,
+                    ),
                   ),
                   child: Icon(
-                    Icons.shopping_cart,
-                    color: _blueDarkColor, // ✅ CAMBIADO A AZUL OSCURO
-                    size: 20,
+                    Icons.shopping_cart_checkout,
+                    color: _blueDarkColor,
+                    size: 22,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.message.notification?.title ?? 'Nueva compra',
+                        widget.message.notification?.title ?? 'NUEVA COMPRA',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: _blueDarkColor, // ✅ TÍTULO EN AZUL OSCURO
+                          fontSize: 15,
+                          color: _blueDarkColor,
+                          letterSpacing: 0.2,
                         ),
                       ),
                       Text(
-                        widget.message.notification?.body ?? 'Toca para ver detalles',
+                        cuerpo,
                         style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // ✅ INDICADOR DE TIEMPO RESTANTE CON ANIMACIÓN
-                      Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        child: AnimatedBuilder(
-                          animation: _progressAnimation,
-                          builder: (context, child) {
-                            final progress = _progressAnimation.value;
-                            return FractionallySizedBox(
-                              widthFactor: progress,
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: progress > 0.5
-                                      ? Colors.green.shade600
-                                      : progress > 0.2
-                                      ? Colors.orange.shade600
-                                      : Colors.red.shade600,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            );
-                          },
+                          fontSize: 13,
+                          color: Colors.grey.shade800,
+                          height: 1.3,
                         ),
                       ),
                     ],
                   ),
                 ),
-                // ✅ BOTÓN X QUE RECHAZA LA COMPRA
-                IconButton(
-                  icon: Icon(
-                    Icons.close,
-                    size: 20,
-                    color: Colors.red.shade700,
+                const SizedBox(width: 8),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.red.shade300,
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.15),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  onPressed: widget.onClose,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: 40,
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Colors.red.shade700,
+                    ),
+                    onPressed: widget.onClose,
+                    padding: EdgeInsets.zero,
                   ),
                 ),
               ],
@@ -573,7 +1103,6 @@ class _NotificationOverlayContentState extends State<_NotificationOverlayContent
   }
 }
 
-// ✅ PANTALLA DE DETALLE DE NOTIFICACIÓN
 class NotificationDetailScreen extends StatefulWidget {
   final Map<String, dynamic> notificationData;
   final String notificationTitle;
@@ -603,15 +1132,17 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
-  // ✅ COLOR AZUL OSCURO (IGUAL QUE EN PROFILE SCREEN)
   final Color _blueDarkColor = const Color(0xFF0055B8);
-
-  // ✅ COLOR DE FONDO DE TARJETAS APROBADAS (IGUAL QUE EN PROFILE SCREEN)
   final Color _approvedCardBackground = const Color(0xFFE8F0FE);
 
   @override
   void initState() {
     super.initState();
+    print('\n📱 [NotificationDetailScreen] initState');
+    print('📋 Datos recibidos en pantalla:');
+    widget.notificationData.forEach((key, value) {
+      print('   • $key: $value (tipo: ${value.runtimeType})');
+    });
 
     _controller = AnimationController(
       vsync: this,
@@ -627,16 +1158,8 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
       CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
     );
 
-    // ✅ IMPRIMIR DATOS DE LA NOTIFICACIÓN PARA DEBUG
-    print('📋 Datos de notificación recibidos:');
-    widget.notificationData.forEach((key, value) {
-      print('   - $key: $value');
-    });
-
-    // ✅ INICIAR TIMER PARA RECHAZO AUTOMÁTICO EN 15 SEGUNDOS
     _startAutoRejectTimer();
 
-    // ✅ CERRAR CUALQUIER NOTIFICACIÓN QUE PUEDA HABER QUEDADO ABIERTA
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationHandler._closeCurrentNotifications();
     });
@@ -646,36 +1169,38 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
   void dispose() {
     _autoRejectTimer.cancel();
     _controller.dispose();
+    print('🗑️ [NotificationDetailScreen] dispose');
     super.dispose();
   }
 
-  // ✅ TIMER PARA RECHAZO AUTOMÁTICO (15 SEGUNDOS)
   void _startAutoRejectTimer() {
-    print('⏰ Iniciando timer de rechazo automático (15 segundos)');
+    print('⏰ [NotificationDetailScreen] Timer de 15 segundos iniciado');
     _autoRejectTimer = Timer(const Duration(seconds: 15), () {
-      print('⏰ Tiempo agotado - Rechazo automático de compra');
+      print('⏰ [NotificationDetailScreen] Tiempo agotado - Rechazo automático');
       if (!_showResultAnimation && !_isLoading) {
         _rejectCompra(descripcion: 'Compra cancelada por tiempo de espera agotado');
       }
     });
   }
 
-  // ✅ MÉTODO PARA RECHAZAR COMPRA AL PRESIONAR BACK BUTTON
   Future<void> _rejectOnBackButton() async {
-    print('⬅️ Back button presionado - Rechazando compra');
+    print('⬅️ [NotificationDetailScreen] Back button presionado');
 
     if (_autoRejectTimer.isActive) {
       _autoRejectTimer.cancel();
-      print('⏰ Timer de rechazo automático cancelado por back button');
+      print('⏰ [NotificationDetailScreen] Timer cancelado por back button');
     }
 
     try {
+      final tokenVenta = widget.notificationData['token_venta'] ?? '';
       final Map<String, dynamic> requestBody = {
-        "token_venta": widget.notificationData['token_venta'] ?? '',
+        "token_venta": tokenVenta,
         "descripcion": "Compra cancelada al retroceder de la pantalla",
       };
 
-      print('📤 Rechazando compra por back button...');
+      print('📤 [NotificationDetailScreen] Enviando rechazo por back button:');
+      print('   • Token venta: $tokenVenta');
+      print('   • Request: ${json.encode(requestBody)}');
 
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/RechazarCompra/api/v1/'),
@@ -687,24 +1212,26 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 10));
 
-      print('📥 Response rechazo por back button - Status: ${response.statusCode}');
+      print('📥 [NotificationDetailScreen] Respuesta rechazo - Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        print('✅ Compra rechazada exitosamente por back button');
+        print('✅ [NotificationDetailScreen] Compra rechazada por back button');
       } else {
-        print('❌ Error al rechazar compra por back button: ${response.statusCode}');
+        print('❌ [NotificationDetailScreen] Error en rechazo: ${response.statusCode}');
+        print('   • Body: ${response.body}');
       }
 
     } catch (e) {
-      print('❌ Error en _rejectOnBackButton: $e');
+      print('❌ [NotificationDetailScreen] Error en _rejectOnBackButton: $e');
     }
   }
 
-  // ✅ FORMATO DE MONEDA CHILENA CORREGIDO
   String _formatCurrency(String amount) {
     try {
       String cleanAmount = amount.replaceAll(RegExp(r'[^\d]'), '');
       int value = int.tryParse(cleanAmount) ?? 0;
+
+      if (value == 0) return '\$0';
 
       String amountStr = value.toString();
       String formatted = '';
@@ -720,22 +1247,25 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
 
       return '\$$formatted';
     } catch (e) {
+      print('⚠️ [NotificationDetailScreen] Error formateando "$amount": $e');
       return '\$$amount';
     }
   }
 
   Future<void> _abrirPoliticaCobranza() async {
+    print('🌐 [NotificationDetailScreen] Abriendo política de cobranza');
     final Uri url = Uri.parse('http://orsanevaluaciones.cl/wp-content/uploads/2025/11/Consentimiento-Legal-y-Autorizacion-de-Contacto.pdf');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       throw Exception('No se pudo abrir la URL: $url');
     }
   }
 
-  // ✅ MÉTODO PARA RECHAZAR COMPRA
   Future<void> _rejectCompra({required String descripcion}) async {
+    print('\n🔄 [NotificationDetailScreen] ========== RECHAZANDO COMPRA ==========');
+
     if (_autoRejectTimer.isActive) {
       _autoRejectTimer.cancel();
-      print('⏰ Timer de rechazo automático cancelado');
+      print('⏰ [NotificationDetailScreen] Timer cancelado');
     }
 
     setState(() {
@@ -743,12 +1273,17 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     });
 
     try {
-      print('🔄 ========== RECHAZANDO COMPRA ==========');
-
+      final tokenVenta = widget.notificationData['token_venta'] ?? '';
       final Map<String, dynamic> requestBody = {
-        "token_venta": widget.notificationData['token_venta'] ?? '',
+        "token_venta": tokenVenta,
         "descripcion": descripcion,
       };
+
+      print('📤 [NotificationDetailScreen] Enviando rechazo:');
+      print('   • Token venta: $tokenVenta');
+      print('   • Descripción: $descripcion');
+      print('   • URL: ${GlobalVariables.baseUrl}/RechazarCompra/api/v1/');
+      print('   • Request: ${json.encode(requestBody)}');
 
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/RechazarCompra/api/v1/'),
@@ -760,17 +1295,22 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 30));
 
+      print('📥 [NotificationDetailScreen] Respuesta recibida:');
+      print('   • Status: ${response.statusCode}');
+      print('   • Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         _apiResponseData = responseData;
         _apiResponseMessage = responseData['mensaje'] ?? descripcion;
-        print('✅ Compra rechazada exitosamente');
+        print('✅ [NotificationDetailScreen] Compra rechazada exitosamente');
       } else {
         _apiResponseMessage = 'Error al rechazar compra: ${response.statusCode}';
+        print('❌ [NotificationDetailScreen] Error en respuesta: ${response.statusCode}');
       }
 
     } catch (e) {
-      print('❌ Error en _rejectCompra: $e');
+      print('❌ [NotificationDetailScreen] Error en _rejectCompra: $e');
       _apiResponseMessage = 'Error de conexión: $e';
     } finally {
       setState(() {
@@ -779,19 +1319,22 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         _showResultAnimation = true;
       });
       _controller.forward();
+      print('🎬 [NotificationDetailScreen] Mostrando animación de rechazo');
     }
   }
 
-  // ✅ MÉTODO PARA CONFIRMAR COMPRA
   Future<void> _confirmAction(BuildContext context) async {
+    print('\n🔄 [NotificationDetailScreen] ========== CONFIRMANDO COMPRA ==========');
+
     if (!_aceptoPoliticas) {
+      print('❌ [NotificationDetailScreen] Políticas no aceptadas');
       _mostrarErrorPoliticas();
       return;
     }
 
     if (_autoRejectTimer.isActive) {
       _autoRejectTimer.cancel();
-      print('⏰ Timer de rechazo automático cancelado por confirmación');
+      print('⏰ [NotificationDetailScreen] Timer cancelado por confirmación');
     }
 
     setState(() {
@@ -799,8 +1342,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     });
 
     try {
-      print('🔄 ========== CONFIRMANDO COMPRA ==========');
-
       final Map<String, dynamic> requestBody = {
         "token_comprador": widget.notificationData['token_comprador'] ?? '',
         "token_vendedor": widget.notificationData['token_vendedor'] ?? '',
@@ -819,6 +1360,13 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         "token_venta": widget.notificationData['token_venta'] ?? '',
       };
 
+      print('📤 [NotificationDetailScreen] Enviando confirmación:');
+      print('   • URL: ${GlobalVariables.baseUrl}/GuardarCompra/api/v1/');
+      print('   • Request body:');
+      requestBody.forEach((key, value) {
+        print('     - $key: $value');
+      });
+
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/GuardarCompra/api/v1/'),
         headers: {
@@ -829,9 +1377,18 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 30));
 
+      print('📥 [NotificationDetailScreen] Respuesta recibida:');
+      print('   • Status: ${response.statusCode}');
+      print('   • Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         _apiResponseData = responseData;
+
+        print('📊 [NotificationDetailScreen] Datos de respuesta:');
+        responseData.forEach((key, value) {
+          print('   • $key: $value');
+        });
 
         final bool success = responseData['success'] == true;
         final int estadoVenta = responseData['estado_venta'] ?? 0;
@@ -840,13 +1397,20 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         _isApproved = success && estadoVenta == 1;
         _apiResponseMessage = mensaje;
 
+        print('✅ [NotificationDetailScreen] Confirmación procesada:');
+        print('   • Success: $success');
+        print('   • Estado venta: $estadoVenta');
+        print('   • Aprobado: $_isApproved');
+        print('   • Mensaje: $_apiResponseMessage');
+
       } else {
         _isApproved = false;
         _apiResponseMessage = 'Error de conexión: ${response.statusCode}';
+        print('❌ [NotificationDetailScreen] Error en respuesta: ${response.statusCode}');
       }
 
     } catch (e) {
-      print('❌ Error en _confirmAction: $e');
+      print('❌ [NotificationHandler] Error en _confirmAction: $e');
       _isApproved = false;
       _apiResponseMessage = 'Error de conexión: $e';
     } finally {
@@ -855,11 +1419,12 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         _showResultAnimation = true;
       });
       _controller.forward();
+      print('🎬 [NotificationDetailScreen] Mostrando animación de resultado');
     }
   }
 
   void _rejectAction(BuildContext context) {
-    print('❌ COMPRA RECHAZADA MANUALMENTE POR EL USUARIO');
+    print('❌ [NotificationDetailScreen] COMPRA RECHAZADA MANUALMENTE');
     _rejectCompra(descripcion: 'Compra rechazada manualmente por el usuario');
   }
 
@@ -873,19 +1438,16 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     );
   }
 
-  // ✅ MÉTODO MODIFICADO: NAVEGAR AL DASHBOARD SOLO RECHAZANDO SI NO SE CONFIRMÓ
   void _navigateToDashboard() {
-    print('⬅️ Navegando al Dashboard...');
+    print('🧭 [NotificationDetailScreen] Navegando al Dashboard...');
 
-    // ✅ SOLO RECHAZAR LA COMPRA SI NO SE HA CONFIRMADO
     if (!_showResultAnimation || !_isApproved) {
-      print('🔄 Rechazando compra antes de navegar (no confirmada)');
+      print('🔄 [NotificationDetailScreen] Rechazando compra antes de navegar');
       _rejectOnBackButton();
     } else {
-      print('✅ Compra confirmada, navegando sin rechazar');
+      print('✅ [NotificationDetailScreen] Compra confirmada, navegando sin rechazar');
     }
 
-    // ✅ NAVEGAR AL DASHBOARD Y LIMPIAR TODAS LAS RUTAS ANTERIORES
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => DashboardScreen(userData: {})),
@@ -893,15 +1455,14 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     );
   }
 
-  // ✅ MÉTODO PARA MANEJAR EL BACK BUTTON DEL DISPOSITIVO (ANDROID/IOS)
   Future<bool> _onWillPop() async {
-    print('⬅️ Back button del dispositivo presionado - Rechazando compra');
+    print('⬅️ [NotificationDetailScreen] Back button del dispositivo');
     await _rejectOnBackButton();
-    return true; // Permitir la navegación hacia atrás
+    return true;
   }
 
   void _onFinalizar() {
-    // ✅ SOLO NAVEGAR, NO RECHAZAR SI YA SE CONFIRMÓ
+    print('🏁 [NotificationDetailScreen] Finalizando proceso');
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => DashboardScreen(userData: {})),
@@ -909,8 +1470,25 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     );
   }
 
-  // ✅ ANIMACIÓN PARA COMPRA APROBADA
   Widget _buildApprovedAnimation() {
+    print('✅ [NotificationDetailScreen] Construyendo animación de aprobación');
+
+    final montoCompraStr = widget.notificationData['monto'] ?? '0';
+    final montoCompra = int.tryParse(montoCompraStr.replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
+
+    final montoDisponibleActualStr = _apiResponseData['monto_disponible']?.toString() ?? '0';
+    final montoDisponibleActual = int.tryParse(montoDisponibleActualStr.replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
+
+    final montoDisponibleFinal = (montoDisponibleActual - montoCompra).clamp(0, double.infinity);
+
+    final montoDisponibleFormateado = _formatCurrency(montoDisponibleFinal.toString());
+
+    print('💰 [NotificationDetailScreen] Cálculos de montos:');
+    print('   • Monto compra: $montoCompra');
+    print('   • Monto disponible actual: $montoDisponibleActual');
+    print('   • Monto disponible final: $montoDisponibleFinal');
+    print('   • Monto a mostrar: $montoDisponibleFormateado');
+
     return Scaffold(
       backgroundColor: const Color(0xFFE3FAEF),
       body: SafeArea(
@@ -936,7 +1514,9 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    _apiResponseMessage.isNotEmpty ? _apiResponseMessage : "Tu compra ha sido confirmada",
+                    _apiResponseMessage.isNotEmpty
+                        ? _apiResponseMessage
+                        : "¡Compra confirmada exitosamente!",
                     style: const TextStyle(
                       color: Color(0xFF0A915C),
                       fontSize: 18,
@@ -944,17 +1524,19 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  if (_apiResponseData['monto_disponible'] != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      'Monto disponible: ${_formatCurrency(_apiResponseData['monto_disponible'].toString())}',
-                      style: const TextStyle(
-                        color: Color(0xFF0A915C),
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
+
+                  const SizedBox(height: 16),
+
+                  Text(
+                    'Monto disponible: $montoDisponibleFormateado',
+                    style: const TextStyle(
+                      color: Color(0xFF0A915C),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
-                  ],
+                    textAlign: TextAlign.center,
+                  ),
+
                   const SizedBox(height: 40),
                   SizedBox(
                     width: 200,
@@ -986,8 +1568,8 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     );
   }
 
-  // ✅ ANIMACIÓN PARA COMPRA RECHAZADA
   Widget _buildRejectedAnimation() {
+    print('❌ [NotificationDetailScreen] Construyendo animación de rechazo');
     return Scaffold(
       backgroundColor: const Color(0xFFFDE8E8),
       body: SafeArea(
@@ -1013,7 +1595,9 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    _apiResponseMessage.isNotEmpty ? _apiResponseMessage : "Tu compra no ha sido aceptada",
+                    _apiResponseMessage.isNotEmpty
+                        ? _apiResponseMessage
+                        : "Tu compra no ha sido aceptada",
                     style: const TextStyle(
                       color: Color(0xFFD32F2F),
                       fontSize: 18,
@@ -1080,7 +1664,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
 
   @override
   Widget build(BuildContext context) {
-    // ✅ USAR WillPopScope PARA MANEJAR EL BACK BUTTON DEL DISPOSITIVO
+    print('🏗️ [NotificationDetailScreen] build()');
     return WillPopScope(
       onWillPop: _onWillPop,
       child: _buildMainContent(),
@@ -1091,6 +1675,8 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     if (_showResultAnimation) {
       return _isApproved ? _buildApprovedAnimation() : _buildRejectedAnimation();
     }
+
+    final empresa = widget.notificationData['nombre_empresa'] ?? 'No especificada';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1108,7 +1694,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
             fontWeight: FontWeight.bold,
           ),
         ),
-        centerTitle: true, // ✅ TÍTULO CENTRADO
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -1123,16 +1709,16 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _blueDarkColor.withOpacity(0.1), // ✅ FONDO AZUL CLARO CON OPACIDAD
+                      color: _blueDarkColor.withOpacity(0.1),
                       border: Border.all(
-                        color: _blueDarkColor, // ✅ BORDE AZUL OSCURO
+                        color: _blueDarkColor,
                         width: 2,
                       ),
                     ),
                     child: Icon(
                       Icons.shopping_cart,
                       size: 40,
-                      color: _blueDarkColor, // ✅ CAMBIADO A AZUL OSCURO
+                      color: _blueDarkColor,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1141,9 +1727,9 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: _blueDarkColor, // ✅ TÍTULO EN AZUL OSCURO
+                      color: _blueDarkColor,
                     ),
-                    textAlign: TextAlign.center, // ✅ TÍTULO CENTRADO
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -1160,10 +1746,16 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
 
             const SizedBox(height: 32),
 
-            // ✅ UNA SOLA TARJETA QUE CONTIENE TODO
             _buildInfoCard(
               children: [
-                // ✅ COMERCIO
+                _buildInfoItemConIcono(
+                  icon: Icons.business,
+                  label: 'Empresa',
+                  value: empresa,
+                  color: _blueDarkColor,
+                ),
+                const SizedBox(height: 16),
+
                 _buildInfoItemConIcono(
                   icon: Icons.store,
                   label: 'Comercio',
@@ -1172,7 +1764,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                 ),
                 const SizedBox(height: 16),
 
-                // ✅ MONTO
                 _buildInfoItemConIcono(
                   icon: Icons.attach_money,
                   label: 'Monto',
@@ -1181,7 +1772,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                 ),
                 const SizedBox(height: 16),
 
-                // ✅ LÍNEA DIVISORIA
                 const Divider(
                   color: Colors.grey,
                   thickness: 1,
@@ -1189,13 +1779,13 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                 ),
                 const SizedBox(height: 16),
 
-                // ✅ ACEPTACIÓN DE POLÍTICAS
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Checkbox(
                       value: _aceptoPoliticas,
                       onChanged: (bool? value) {
+                        print('✓ [NotificationDetailScreen] Checkbox cambiado: $value');
                         setState(() {
                           _aceptoPoliticas = value ?? false;
                         });
@@ -1239,7 +1829,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
               children: [
                 Expanded(
                   child: SizedBox(
-                    height: 50, // ✅ MISMA ALTURA PARA AMBOS BOTONES
+                    height: 50,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : () => _rejectAction(context),
                       style: ElevatedButton.styleFrom(
@@ -1263,14 +1853,14 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                 const SizedBox(width: 16),
                 Expanded(
                   child: SizedBox(
-                    height: 50, // ✅ MISMA ALTURA PARA AMBOS BOTONES
+                    height: 50,
                     child: ElevatedButton(
                       onPressed: _aceptoPoliticas && !_isLoading
                           ? () => _confirmAction(context)
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _aceptoPoliticas && !_isLoading
-                            ? _blueDarkColor // ✅ AZUL OSCURO CUANDO ESTÁ HABILITADO
+                            ? _blueDarkColor
                             : Colors.grey.shade400,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -1289,7 +1879,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                         'Confirmar',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.white, // ✅ TEXTO EN BLANCO
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1304,7 +1894,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     );
   }
 
-  // ✅ NUEVO MÉTODO PARA CONSTRUIR TARJETA CON DISEÑO UNIFORME (COMO EN PROFILE SCREEN)
   Widget _buildInfoCard({required List<Widget> children}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1333,7 +1922,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: _approvedCardBackground, // ← FONDO AZUL CLARO (#E8F0FE)
+            color: _approvedCardBackground,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -1345,7 +1934,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     );
   }
 
-  // ✅ MÉTODO PARA CONSTRUIR ÍTEMS CON ICONO (COMO EN PROFILE SCREEN)
   Widget _buildInfoItemConIcono({
     required IconData icon,
     required String label,
@@ -1363,7 +1951,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
           ),
           child: Icon(
             icon,
-            color: color, // ← ÍCONO EN AZUL OSCURO
+            color: color,
             size: 20,
           ),
         ),
@@ -1376,7 +1964,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                 label,
                 style: const TextStyle(
                   fontSize: 12,
-                  color: Colors.grey, // ← SUBTÍTULO EN GRIS
+                  color: Colors.grey,
                 ),
               ),
               const SizedBox(height: 4),
@@ -1385,7 +1973,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black, // ← TÍTULO EN NEGRO
+                  color: Colors.black,
                 ),
               ),
             ],

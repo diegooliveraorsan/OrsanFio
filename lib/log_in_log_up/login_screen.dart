@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   String _deviceToken = 'generando...';
+  bool _mostrarPassword = false; // ✅ NUEVO: Control para mostrar/ocultar contraseña
 
   // Función para detectar la plataforma real
   String _getPlatform() {
@@ -330,14 +331,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 20),
 
+              // ✅ MODIFICADO: Campo de contraseña con botón para mostrar/ocultar
               TextField(
                 controller: _passwordController,
-                decoration: const InputDecoration(
+                obscureText: !_mostrarPassword, // ✅ Cambiado para controlar visibilidad
+                decoration: InputDecoration(
                   labelText: 'Contraseña',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock),
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton( // ✅ Agregado botón de visibilidad
+                    icon: Icon(
+                      _mostrarPassword ? Icons.visibility_off : Icons.visibility,
+                      color: Colors.grey,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _mostrarPassword = !_mostrarPassword;
+                      });
+                    },
+                  ),
                 ),
-                obscureText: true,
               ),
 
               const SizedBox(height: 40),
