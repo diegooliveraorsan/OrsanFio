@@ -470,11 +470,26 @@ class _SplashScreenState extends State<SplashScreen>
       body: Center(
         child: FadeTransition(
           opacity: _animation,
-          child: Image.asset(
-            'assets/images/logo_fio.png',
-            height: 150,
-            width: 150,
-            fit: BoxFit.contain,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/images/logo_fio.png',
+                height: 150,
+                width: 150,
+                fit: BoxFit.contain,
+              ),
+              if (GlobalVariables.isDebugMode) ...[
+                SizedBox(height: 20),
+                Text(
+                  'Versión: ${GlobalVariables.appVersion}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),

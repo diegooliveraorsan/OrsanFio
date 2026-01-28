@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../document_reader/document_reader_service.dart';
 import '../face_api/face_api_service.dart';
-import '../dashboard_screen.dart';
+import '../dashboard_screen2.dart';
 import '../variables_globales.dart';
 
 // Clase de utilidades para RUT chileno

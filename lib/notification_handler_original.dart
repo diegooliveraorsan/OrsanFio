@@ -5,7 +5,7 @@ import 'dart:async'; // ✅ IMPORTACIÓN AGREGADA
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 
-import 'dashboard_screen.dart';
+import 'dashboard_screen2.dart';
 import 'variables_globales.dart';
 
 class NotificationHandler {

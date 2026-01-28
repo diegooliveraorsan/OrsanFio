@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'variables_globales.dart';
 
 // ✅ COLOR AZUL OSCURO DEFINIDO GLOBALMENTE
@@ -35,9 +37,60 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
   DateTime? _horaEnvioCodigo;
   int _intentosFallidos = 0;
   int _intentosRestantes = 3;
+  String? _deviceToken;
 
   // ✅ TIMER PARA ACTUALIZAR EL CONTADOR
   Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ✅ OBTENER TOKEN DEL DISPOSITIVO (FCM)
+    _initializeDeviceToken();
+
+    // ✅ Si es reenvío desde perfil, marcar como código ya enviado
+    if (widget.esReenvio) {
+      _codigoEnviado = true;
+      _horaEnvioCodigo = DateTime.now();
+      _iniciarTimer();
+    }
+
+    // ✅ Escuchar cambios en los campos de texto
+    _codigoController.addListener(_actualizarEstadoBoton);
+    _nuevaPasswordController.addListener(() {
+      _actualizarEstadoBoton();
+      setState(() {}); // Para actualizar el indicador en tiempo real
+    });
+    _confirmarPasswordController.addListener(_actualizarEstadoBoton);
+  }
+
+  // ✅ OBTENER TOKEN DEL DISPOSITIVO (FCM)
+  Future<void> _initializeDeviceToken() async {
+    try {
+      await Firebase.initializeApp();
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+      if (fcmToken != null) {
+        print('✅ Token FCM obtenido para recuperación de contraseña: $fcmToken');
+        setState(() {
+          _deviceToken = fcmToken;
+        });
+      } else {
+        print('⚠️ No se pudo obtener token FCM, usando fallback');
+        final String fallbackToken = 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
+        setState(() {
+          _deviceToken = fallbackToken;
+        });
+      }
+    } catch (e) {
+      print('❌ Error obteniendo token FCM: $e');
+      final String errorToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
+      setState(() {
+        _deviceToken = errorToken;
+      });
+    }
+  }
 
   // ✅ VALIDACIÓN DE CONTRASEÑA SEGURA
   bool _esContrasenaSegura(String contrasena) {
@@ -68,25 +121,6 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    // ✅ Si es reenvío desde perfil, marcar como código ya enviado
-    if (widget.esReenvio) {
-      _codigoEnviado = true;
-      _horaEnvioCodigo = DateTime.now();
-      _iniciarTimer();
-    }
-
-    // ✅ Escuchar cambios en los campos de texto
-    _codigoController.addListener(_actualizarEstadoBoton);
-    _nuevaPasswordController.addListener(() {
-      _actualizarEstadoBoton();
-      setState(() {}); // Para actualizar el indicador en tiempo real
-    });
-    _confirmarPasswordController.addListener(_actualizarEstadoBoton);
-  }
-
-  @override
   void dispose() {
     // ✅ CANCELAR TIMER AL SALIR
     _timer?.cancel();
@@ -98,6 +132,37 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
     });
     _confirmarPasswordController.removeListener(_actualizarEstadoBoton);
     super.dispose();
+  }
+
+  // ✅ VERIFICAR SI LA SESIÓN HA EXPIRADO Y REINICIAR APP
+  void _verificarSesionExpirada(Map<String, dynamic> responseData) {
+    if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
+      print('⚠️ Sesión expirada detectada en CodigoVerificacionScreen');
+
+      // Mostrar mensaje de sesión cerrada
+      _mostrarError('Sesión cerrada. Por favor, inicia sesión nuevamente.');
+
+      // ✅ REINICIAR LA APLICACIÓN INSTANTÁNEAMENTE
+      _reiniciarAplicacion();
+    }
+  }
+
+  // ✅ REINICIAR LA APLICACIÓN NAVEGANDO AL MAIN
+  void _reiniciarAplicacion() {
+    print('🔄 Reiniciando aplicación desde CodigoVerificacionScreen...');
+
+    // Navegar a la pantalla de splash/main reiniciando toda la pila
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/', // Usar la ruta raíz
+          (route) => false, // Eliminar todas las rutas anteriores
+    );
+
+    // Si usas MaterialApp con home: UpdateCheckScreen(), esto navegará al inicio
+    // También puedes forzar un hot reload del widget raíz
+    if (Navigator.canPop(context)) {
+      Navigator.popUntil(context, (route) => route.isFirst);
+    }
   }
 
   // ✅ Función para actualizar el estado del botón basado en los campos
@@ -154,9 +219,15 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
     });
   }
 
-  // ✅ ENVIAR CÓDIGO
+  // ✅ ENVIAR CÓDIGO (API v2 CON TOKEN DE DISPOSITIVO)
   Future<void> _enviarCodigo() async {
     print('🔄 Enviando código...');
+
+    // Verificar que tenemos token del dispositivo
+    if (_deviceToken == null) {
+      _mostrarError('No se pudo obtener el token del dispositivo. Intenta nuevamente.');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -166,14 +237,15 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
       final requestBody = {
         "token_comprador": widget.tokenComprador,
         "mail": widget.email,
+        "token_dispositivo": _deviceToken!, // ✅ NUEVO CAMPO REQUERIDO EN v2
       };
 
-      print('📤 Request CorreoCodigoCambioPassword:');
-      print('🌐 URL: ${GlobalVariables.baseUrl}/CorreoCodigoCambioPassword/api/v1/');
+      print('📤 Request CorreoCodigoCambioPassword (v2):');
+      print('🌐 URL: ${GlobalVariables.baseUrl}/CorreoCodigoCambioPassword/api/v2/'); // ✅ CAMBIADO A v2
       print('📋 Body: ${json.encode(requestBody)}');
 
       final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/CorreoCodigoCambioPassword/api/v1/'),
+        Uri.parse('${GlobalVariables.baseUrl}/CorreoCodigoCambioPassword/api/v2/'), // ✅ CAMBIADO A v2
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -182,12 +254,22 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 15));
 
-      print('📥 Response CorreoCodigoCambioPassword:');
+      print('📥 Response CorreoCodigoCambioPassword (v2):');
       print('  - Status: ${response.statusCode}');
       print('  - Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
+
+        // ✅ VERIFICAR SI LA SESIÓN HA EXPIRADO - SOLO 1 SNACKBAR
+        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
+          _mostrarError('Sesión cerrada. Por favor, inicia sesión nuevamente.');
+
+          // ✅ REINICIAR LA APLICACIÓN INSTANTÁNEAMENTE
+          _reiniciarAplicacion();
+
+          return; // ⬅️ IMPORTANTE: Salir del método para no mostrar otro SnackBar
+        }
 
         if (responseData['success'] == true) {
           setState(() {
@@ -203,8 +285,23 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
           _iniciarTimer();
         } else {
           final mensajeError = responseData['message'] ?? 'Error desconocido';
-          _mostrarError('Error: $mensajeError');
+
+          // Manejo de errores específicos según la API
+          if (responseData['codigo_error'] == 'TOKEN_DISPOSITIVO_INVALIDO') {
+            _mostrarError('Error de dispositivo. Por favor, reinicia la aplicación.');
+          } else {
+            _mostrarError('Error: $mensajeError');
+          }
         }
+      } else if (response.statusCode == 401) {
+        // ✅ SESIÓN EXPIRADA POR STATUS 401 - SOLO 1 SNACKBAR
+        print('🔐 Sesión expirada (401 Unauthorized)');
+        _mostrarError('Sesión cerrada. Por favor, inicia sesión nuevamente.');
+
+        // ✅ REINICIAR LA APLICACIÓN INSTANTÁNEAMENTE
+        _reiniciarAplicacion();
+
+        return; // ⬅️ IMPORTANTE: Salir del método
       } else {
         print('❌ Error en API CorreoCodigoCambioPassword - Status: ${response.statusCode}');
         _mostrarError('Error al enviar código: ${response.statusCode}');
@@ -221,9 +318,15 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
     }
   }
 
-  // ✅ CONFIRMAR CAMBIO DE CONTRASEÑA CON CÓDIGO
+  // ✅ CONFIRMAR CAMBIO DE CONTRASEÑA CON CÓDIGO (API v2 - CUERPO ACTUALIZADO)
   Future<void> _confirmarCambioPassword() async {
     print('🔄 Confirmando cambio de contraseña...');
+
+    // Verificar que tenemos token del dispositivo
+    if (_deviceToken == null) {
+      _mostrarError('No se pudo obtener el token del dispositivo. Intenta nuevamente.');
+      return;
+    }
 
     // Validaciones
     final codigo = _codigoController.text.trim();
@@ -274,19 +377,20 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
     });
 
     try {
+      // ✅ CUERPO ACTUALIZADO SEGÚN TU ESPECIFICACIÓN
       final requestBody = {
-        "token_comprador": widget.tokenComprador,
-        "codigo_verificador": codigo,
         "mail": widget.email,
+        "codigo_verificador": codigo,
         "nuevo_pass": nuevaPassword,
+        "token_dispositivo": _deviceToken!,
       };
 
-      print('📤 Request ConfirmarCambioPassword:');
-      print('🌐 URL: ${GlobalVariables.baseUrl}/ConfirmarCambioPassword/api/v1/');
+      print('📤 Request ConfirmarCambioPassword (v2):');
+      print('🌐 URL: ${GlobalVariables.baseUrl}/ConfirmarCambioPassword/api/v2/'); // ✅ ACTUALIZADO A v2
       print('📋 Body: ${json.encode(requestBody)}');
 
       final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/ConfirmarCambioPassword/api/v1/'),
+        Uri.parse('${GlobalVariables.baseUrl}/ConfirmarCambioPassword/api/v2/'), // ✅ ACTUALIZADO A v2
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -295,12 +399,22 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 15));
 
-      print('📥 Response ConfirmarCambioPassword:');
+      print('📥 Response ConfirmarCambioPassword (v2):');
       print('  - Status: ${response.statusCode}');
       print('  - Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
+
+        // ✅ VERIFICAR SI LA SESIÓN HA EXPIRADO - SOLO 1 SNACKBAR
+        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
+          _mostrarError('Sesión cerrada. Por favor, inicia sesión nuevamente.');
+
+          // ✅ REINICIAR LA APLICACIÓN INSTANTÁNEAMENTE
+          _reiniciarAplicacion();
+
+          return; // ⬅️ IMPORTANTE: Salir del método para no mostrar otro SnackBar
+        }
 
         if (responseData['success'] == true) {
           _mostrarExito('Contraseña cambiada exitosamente');
@@ -360,10 +474,22 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
               _horaEnvioCodigo = null;
             });
 
+          } else if (codigoError == 'TOKEN_DISPOSITIVO_INVALIDO') {
+            _mostrarError('Error de dispositivo. Por favor, reinicia la aplicación.');
+
           } else {
             _mostrarError(mensajeError);
           }
         }
+      } else if (response.statusCode == 401) {
+        // ✅ SESIÓN EXPIRADA POR STATUS 401 - SOLO 1 SNACKBAR
+        print('🔐 Sesión expirada (401 Unauthorized)');
+        _mostrarError('Sesión cerrada. Por favor, inicia sesión nuevamente.');
+
+        // ✅ REINICIAR LA APLICACIÓN INSTANTÁNEAMENTE
+        _reiniciarAplicacion();
+
+        return; // ⬅️ IMPORTANTE: Salir del método
       } else {
         print('❌ Error en API ConfirmarCambioPassword - Status: ${response.statusCode}');
         _mostrarError('Error al cambiar contraseña: ${response.statusCode}');
@@ -380,14 +506,20 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
     }
   }
 
-  // ✅ Métodos auxiliares para mostrar mensajes
+  // ✅ MÉTODOS AUXILIARES PARA MOSTRAR MENSAJES (MISMO ESTILO GRIS)
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(mensaje),
-        backgroundColor: Colors.red,
+        content: Text(
+          mensaje,
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.grey[800], // Color gris oscuro
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }
@@ -395,10 +527,16 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
   void _mostrarExito(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(mensaje),
-        backgroundColor: Colors.green,
+        content: Text(
+          mensaje,
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.grey[800], // Color gris oscuro
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }
@@ -516,7 +654,7 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: _blueDarkColor, // ✅ CAMBIADO: Azul oscuro
+            color: _blueDarkColor,
           ),
         ),
         centerTitle: true,
@@ -524,7 +662,7 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
       body: _isLoading && !_codigoEnviado
           ? Center(
         child: CircularProgressIndicator(
-          color: _blueDarkColor, // ✅ CAMBIADO: Azul oscuro
+          color: _blueDarkColor,
         ),
       )
           : SingleChildScrollView(
@@ -534,11 +672,24 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
           children: [
             // ✅ BOTÓN PARA ENVIAR CÓDIGO (solo si no hay código enviado)
             if (!_codigoEnviado) ...[
+              // ✅ MOSTRAR ESTADO DEL TOKEN DISPOSITIVO (solo para debug)
+              if (_deviceToken != null && _deviceToken!.contains('fcm_'))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'Dispositivo: ${_deviceToken!.substring(0, 20)}...',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _enviarCodigo,
+                  onPressed: (_deviceToken != null && !_isLoading) ? _enviarCodigo : null,
                   icon: const Icon(Icons.send, size: 20, color: Colors.white),
                   label: const Text(
                     'Enviar código de verificación',
@@ -549,7 +700,7 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _blueDarkColor, // ✅ CAMBIADO: Azul oscuro
+                    backgroundColor: (_deviceToken != null && !_isLoading) ? _blueDarkColor : Colors.grey.shade400,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -564,9 +715,9 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                 padding: const EdgeInsets.all(16),
                 margin: const EdgeInsets.only(bottom: 24),
                 decoration: BoxDecoration(
-                  color: _blueDarkColor.withOpacity(0.1), // ✅ CAMBIADO: Azul claro
+                  color: _blueDarkColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _blueDarkColor.withOpacity(0.3)), // ✅ CAMBIADO: Borde azul
+                  border: Border.all(color: _blueDarkColor.withOpacity(0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,7 +728,7 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: _blueDarkColor, // ✅ CAMBIADO: Azul oscuro
+                        color: _blueDarkColor,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -599,7 +750,7 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                             Icon(
                               Icons.timer_outlined,
                               size: 18,
-                              color: segundosRestantes < 60 ? Colors.red.shade700 : _blueDarkColor, // ✅ CAMBIADO: Azul oscuro
+                              color: segundosRestantes < 60 ? Colors.red.shade700 : _blueDarkColor,
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -607,7 +758,7 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: segundosRestantes < 60 ? Colors.red.shade700 : _blueDarkColor, // ✅ CAMBIADO: Azul oscuro
+                                color: segundosRestantes < 60 ? Colors.red.shade700 : _blueDarkColor,
                               ),
                             ),
                           ],
@@ -615,13 +766,13 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                         const Spacer(),
                         // ✅ BOTÓN REENVIAR (EN LA MISMA ALTURA)
                         TextButton.icon(
-                          onPressed: _isLoading ? null : _enviarCodigo,
-                          icon: Icon(Icons.refresh, size: 16, color: _blueDarkColor), // ✅ CAMBIADO: Azul oscuro
+                          onPressed: (_deviceToken != null && !_isLoading) ? _enviarCodigo : null,
+                          icon: Icon(Icons.refresh, size: 16, color: _blueDarkColor),
                           label: Text(
                             'Reenviar código',
                             style: TextStyle(
                               fontSize: 14,
-                              color: _blueDarkColor, // ✅ CAMBIADO: Azul oscuro
+                              color: _blueDarkColor,
                             ),
                           ),
                         ),
@@ -684,15 +835,15 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                 hintText: 'Ingresar el código enviado',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade400), // ✅ CONTORNO GRIS
+                  borderSide: BorderSide(color: Colors.grey.shade400),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade400), // ✅ CONTORNO GRIS
+                  borderSide: BorderSide(color: Colors.grey.shade400),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: _blueDarkColor, width: 2), // ✅ CONTORNO AZUL OSCURO AL FOCUS
+                  borderSide: BorderSide(color: _blueDarkColor, width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.grey.shade50,
@@ -724,15 +875,15 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                 hintText: 'Ingresa nueva contraseña',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade400), // ✅ CONTORNO GRIS
+                  borderSide: BorderSide(color: Colors.grey.shade400),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade400), // ✅ CONTORNO GRIS
+                  borderSide: BorderSide(color: Colors.grey.shade400),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: _blueDarkColor, width: 2), // ✅ CONTORNO AZUL OSCURO AL FOCUS
+                  borderSide: BorderSide(color: _blueDarkColor, width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.grey.shade50,
@@ -775,15 +926,15 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
                 hintText: 'Confirma la nueva contraseña',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade400), // ✅ CONTORNO GRIS
+                  borderSide: BorderSide(color: Colors.grey.shade400),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade400), // ✅ CONTORNO GRIS
+                  borderSide: BorderSide(color: Colors.grey.shade400),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: _blueDarkColor, width: 2), // ✅ CONTORNO AZUL OSCURO AL FOCUS
+                  borderSide: BorderSide(color: _blueDarkColor, width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.grey.shade50,
@@ -857,11 +1008,11 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _botonHabilitado ? _confirmarCambioPassword : null,
+                onPressed: (_deviceToken != null && _botonHabilitado) ? _confirmarCambioPassword : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _botonHabilitado
-                      ? _blueDarkColor // ✅ CAMBIADO: Azul oscuro
-                      : Colors.grey.shade400, // ✅ MANTENIDO: Gris para deshabilitado
+                  backgroundColor: (_deviceToken != null && _botonHabilitado)
+                      ? _blueDarkColor
+                      : Colors.grey.shade400,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -893,22 +1044,22 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
 
   Widget _buildRequirementItem(String text) {
     return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          children: [
-            Icon(Icons.check_circle, size: 14, color: Colors.green.shade600),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade700,
-                ),
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, size: 14, color: Colors.green.shade600),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade700,
               ),
             ),
-          ],
-        )
+          ),
+        ],
+      ),
     );
   }
 }

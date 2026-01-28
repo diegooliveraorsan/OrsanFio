@@ -56,13 +56,13 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_face_api: ^7.2.540
-  flutter_face_core_basic: ^7.2.540
+  flutter_face_api: "7.2.626"
+  flutter_face_core_basic: "7.2.235"
   flutter_lints: ^2.0.0
   flutter_launcher_icons: "^0.13.1"
 
 flutter:
-  uses-material-design: true  # <-- ESTO CARGA LOS ICONOS AUTOMÁTICAMENTE
+  uses-material-design: true
 
   assets:
     - assets/images/logo_orsan.png

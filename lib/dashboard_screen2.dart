@@ -400,19 +400,169 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  void _showOptionsMenu() {
-    OptionsModal.show(
+  // ✅ MÉTODO PARA MOSTRAR VISTA DE EMPRESAS
+  void _mostrarVistaEmpresas() {
+    final empresas = _currentUserData['empresas'] ?? [];
+
+    showDialog(
       context: context,
-      userData: _currentUserData,
-      empresaSeleccionada: _empresaSeleccionada,
-      onCambiarEmpresa: _cambiarEmpresa,
-      onMostrarAutorizadores: _mostrarVistaAutorizadores,
-      onMostrarNuevaEmpresa: _mostrarVistaNuevaEmpresa,
-      onReiniciarApp: () => _reiniciarAplicacion(context),
-      onActualizarVista: _verificarSesionActualizada,
-    ).then((_) {
-      _resetModalState();
-    });
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Mis Empresas'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: empresas.length + 1, // +1 para el botón de agregar
+              itemBuilder: (context, index) {
+                if (index < empresas.length) {
+                  final empresa = empresas[index];
+                  final isSelected = empresa['token_empresa'] == _empresaSeleccionada;
+                  return ListTile(
+                    leading: Icon(
+                      Icons.business,
+                      color: isSelected ? _blueDarkColor : Colors.grey,
+                    ),
+                    title: Text(
+                      empresa['nombre_empresa']?.toString() ?? 'Empresa sin nombre',
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? _blueDarkColor : Colors.black,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${empresa['rut_empresa']}-${empresa['dv_rut_empresa']}',
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check, color: _blueDarkColor)
+                        : null,
+                    onTap: () {
+                      _cambiarEmpresa(empresa['token_empresa']);
+                      Navigator.pop(context);
+                    },
+                  );
+                } else {
+                  // Último item: botón para agregar empresa
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context); // Cerrar diálogo actual
+                        _mostrarDialogoAgregarEmpresa();
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar Nueva Empresa'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _blueDarkColor,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ✅ MÉTODO PARA MOSTRAR DIÁLOGO DE AGREGAR EMPRESA
+  void _mostrarDialogoAgregarEmpresa() {
+    String rut = '';
+    String tipoRelacion = 'Representante';
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Agregar Empresa'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'RUT de la empresa (con puntos y guión)',
+                      hintText: 'Ej: 12.345.678-9',
+                    ),
+                    onChanged: (value) => rut = value,
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: tipoRelacion,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de relación',
+                    ),
+                    items: ['Representante', 'Autorizador'].map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        tipoRelacion = value!;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (rut.isNotEmpty) {
+                      Navigator.pop(context);
+                      _agregarEmpresaNuevoEnfoque(rut, tipoRelacion);
+                    }
+                  },
+                  child: const Text('Agregar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ✅ MÉTODO PARA CAMBIAR DE EMPRESA
+  void _cambiarDeEmpresa() {
+    final empresas = _currentUserData['empresas'] ?? [];
+    if (empresas.length <= 1) {
+      mostrarSnackBarGlobal(context, 'Solo tienes una empresa asignada');
+      return;
+    }
+
+    int currentIndex = -1;
+    for (int i = 0; i < empresas.length; i++) {
+      if (empresas[i]['token_empresa'] == _empresaSeleccionada) {
+        currentIndex = i;
+        break;
+      }
+    }
+
+    int nextIndex = (currentIndex + 1) % (empresas.length as int);
+    final siguienteEmpresa = empresas[nextIndex];
+
+    _cambiarEmpresa(siguienteEmpresa['token_empresa']);
+
+    mostrarSnackBarGlobal(
+        context,
+        'Cambiado a: ${siguienteEmpresa['nombre_empresa']}'
+    );
   }
 
   // ✅ MÉTODO PARA MOSTRAR VISTA DE AUTORIZADORES
@@ -436,384 +586,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
       ),
     );
-  }
-
-  // ✅ MÉTODO PARA MOSTRAR VISTA DE NUEVA EMPRESA
-  void _mostrarVistaNuevaEmpresa() {
-    _resetModalState();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OptionsModal.crearVistaNuevaEmpresa(
-          context: context,
-          userData: _currentUserData,
-          onAgregarEmpresa: (rut, tipoRelacion) {
-            print('📤 Empresa agregada desde pantalla: $rut - $tipoRelacion');
-            _agregarEmpresaNuevoEnfoque(rut, tipoRelacion);
-          },
-          onVolver: () => Navigator.pop(context),
-          onReiniciarApp: () => _reiniciarAplicacion(context),
-          onActualizarDashboard: _verificarSesionActualizada,
-        ),
-      ),
-    );
-  }
-
-  // ✅ NUEVO ENFOQUE - MÉTODO SIMPLIFICADO Y ROBUSTO
-  Future<void> _agregarEmpresaNuevoEnfoque(String rut, String tipoRelacion) async {
-    if (_isAgregandoEmpresa) {
-      print('⚠️ Ya hay una operación en curso');
-      _mostrarMensajeSeguro('Ya hay una operación en proceso');
-      return;
-    }
-
-    print('🚀 NUEVO ENFOQUE: Iniciando proceso para agregar empresa: $rut');
-
-    // ✅ 1. MARCAR QUE ESTAMOS PROCESANDO
-    _isAgregandoEmpresa = true;
-    if (mounted) {
-      setState(() {});
-    }
-
-    bool operacionExitosa = false;
-    String? mensajeResultado;
-    bool? fueExitosoDirectamente = false;
-
-    try {
-      // ✅ 2. MOSTRAR DIALOGO DE CARGA INMEDIATAMENTE
-      print('🎬 Mostrando diálogo de carga...');
-
-      final Completer<void> loadingCompleter = Completer<void>();
-      BuildContext? dialogContext;
-
-      // Usar un try-catch para manejar cualquier error al mostrar el diálogo
-      try {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          barrierColor: Colors.black54,
-          useRootNavigator: true,
-          builder: (context) {
-            dialogContext = context;
-            return SimpleLoadingDialog(
-              message: 'Agregando empresa...\nEsto puede tomar unos momentos',
-              completer: loadingCompleter,
-            );
-          },
-        );
-      } catch (e) {
-        print('⚠️ Error mostrando diálogo: $e');
-        // Continuar de todos modos
-      }
-
-      // ✅ 3. DAR TIEMPO PARA QUE EL DIALOGO SE MUESTRE
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      try {
-        // ✅ 4. OBTENER TOKEN FCM
-        await Firebase.initializeApp();
-        String? fcmToken = await FirebaseMessaging.instance.getToken();
-        final String deviceToken = fcmToken ?? 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
-
-        // ✅ 5. PREPARAR DATOS PARA LA API
-        final runData = RutUtils.parseRunFromUserData(_currentUserData);
-        final tokenComprador = _currentUserData['comprador']?['token_comprador']?.toString() ?? '';
-        final runComprador = runData['numero'] ?? '';
-        final dvRunComprador = runData['dv'] ?? '';
-
-        final rutParseado = RutUtils.parseRut(rut);
-        final rutEmpresa = rutParseado['numero'] ?? '';
-        final dvEmpresa = rutParseado['dv'] ?? '';
-
-        final representanteOautorizador = tipoRelacion.toLowerCase() == 'autorizador' ? '1' : '2';
-
-        final requestBody = {
-          "token_comprador": tokenComprador,
-          "run_comprador": runComprador,
-          "dv_comprador": dvRunComprador,
-          "rut_empresa": rutEmpresa,
-          "dv_rut_empresa": dvEmpresa,
-          "represetante_o_autorizador": representanteOautorizador,
-          "token_dispositivo": deviceToken,
-        };
-
-        print('📦 Enviando request body...');
-
-        // ✅ 6. EJECUTAR LA API CON TIMEOUT
-        final response = await http.post(
-          Uri.parse('${GlobalVariables.baseUrl}/AgregarEmpresaAComprador/api/v2/'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'api-key': GlobalVariables.apiKey,
-          },
-          body: json.encode(requestBody),
-        ).timeout(const Duration(seconds: 30));
-
-        print('✅ Respuesta recibida: ${response.statusCode}');
-
-        if (response.statusCode == 200) {
-          final responseData = json.decode(response.body);
-          print('📦 Response Data:');
-          print(responseData);
-
-          // ✅ 7. VERIFICAR SESIÓN
-          if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
-            print('🔐 Sesión expirada, reiniciando app...');
-            _reiniciarAplicacion(context);
-            return;
-          }
-
-          // ✅ 8. VERIFICAR ÉXITO
-          if (responseData['success'] == true) {
-            operacionExitosa = true;
-            fueExitosoDirectamente = true;
-            mensajeResultado = responseData['message'] ?? responseData['mensaje'] ?? 'Empresa agregada exitosamente';
-            print('✅ API exitosa: $mensajeResultado');
-          } else {
-            mensajeResultado = responseData['message'] ?? responseData['error'] ?? 'Error al agregar empresa';
-            print('❌ API error: $mensajeResultado');
-          }
-        } else {
-          mensajeResultado = 'Error del servidor: ${response.statusCode}';
-          print('❌ HTTP error: ${response.statusCode}');
-        }
-      } catch (e) {
-        print('❌ Error en API: $e');
-
-        if (e is TimeoutException) {
-          mensajeResultado = 'La empresa se está procesando. Se actualizará en unos momentos.';
-          operacionExitosa = true; // Considerar éxito para timeouts de procesamiento
-          print('⏰ Timeout - Mensaje especial mostrado');
-        } else {
-          mensajeResultado = 'Error de conexión: ${e.toString().split(':').first}';
-        }
-      }
-
-      // ✅ 9. CERRAR DIALOGO DE CARGA
-      print('🔒 Completando completer para cerrar diálogo...');
-      if (!loadingCompleter.isCompleted) {
-        loadingCompleter.complete();
-      }
-
-      // ✅ 10. CERRAR DIÁLOGO SI SIGUE ABIERTO
-      if (dialogContext != null && mounted) {
-        try {
-          Navigator.of(dialogContext!, rootNavigator: true).pop();
-        } catch (e) {
-          print('⚠️ Error cerrando diálogo: $e');
-        }
-      }
-
-      // ✅ 11. ESPERAR A QUE EL DIÁLOGO SE CIERRE
-      await Future.delayed(const Duration(milliseconds: 500));
-
-    } catch (e) {
-      print('❌ Error en flujo principal: $e');
-      mensajeResultado = 'Error en el proceso: ${e.toString().split(':').first}';
-    } finally {
-      // ✅ 12. PROCESAR RESULTADO FINAL
-      print('🏁 Procesando resultado final...');
-
-      if (mensajeResultado != null) {
-        _mostrarMensajeSeguro(mensajeResultado!);
-      }
-
-      if (operacionExitosa) {
-        print('✅ Operación exitosa, preparando redirección...');
-
-        // ✅ 13. SI FUE EXITOSO DIRECTAMENTE, PROCESAR INMEDIATAMENTE
-        if (fueExitosoDirectamente == true) {
-          // Esperar un momento para que el servidor procese
-          await Future.delayed(const Duration(seconds: 2));
-
-          // Actualizar datos
-          await _verificarSesionActualizada();
-
-          // Buscar y seleccionar la nueva empresa
-          _seleccionarYRedirigirEmpresa(rut);
-        } else {
-          // Para timeouts, usar un enfoque más lento
-          _actualizarDatosDespuesDeAgregarEmpresa(rut);
-        }
-      }
-
-      // ✅ 14. LIMPIAR ESTADO
-      _isAgregandoEmpresa = false;
-      if (mounted) {
-        setState(() {});
-      }
-    }
-  }
-
-  // ✅ MÉTODO AUXILIAR PARA SELECCIONAR Y REDIRIGIR
-  void _seleccionarYRedirigirEmpresa(String rut) {
-    print('🎯 Buscando y seleccionando empresa: $rut');
-
-    final rutParseado = RutUtils.parseRut(rut);
-    final rutNumero = rutParseado['numero'] ?? '';
-    final rutDv = rutParseado['dv'] ?? '';
-
-    if (rutNumero.isEmpty || rutDv.isEmpty) {
-      print('❌ RUT inválido: $rut');
-      return;
-    }
-
-    final empresas = _currentUserData['empresas'] ?? [];
-    bool empresaEncontrada = false;
-
-    for (var empresa in empresas) {
-      final rutEmpresa = empresa['rut_empresa']?.toString() ?? '';
-      final dvEmpresa = empresa['dv_rut_empresa']?.toString() ?? '';
-
-      if (rutEmpresa == rutNumero && dvEmpresa == rutDv) {
-        final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? 'Nueva Empresa';
-        final tokenEmpresa = empresa['token_empresa'];
-
-        print('✅ Empresa encontrada: $nombreEmpresa (Token: $tokenEmpresa)');
-
-        if (mounted && tokenEmpresa != null) {
-          setState(() {
-            _empresaSeleccionada = tokenEmpresa;
-            empresaEncontrada = true;
-          });
-
-          // Actualizar animaciones
-          _actualizarValoresAnimados();
-          _iniciarAnimacion();
-          _verificarMostrarMensajeLineaCredito();
-
-          // Mostrar mensaje
-          _mostrarMensajeSeguro('Empresa "$nombreEmpresa" seleccionada');
-
-          // Cerrar pantallas de diálogo/modal si existen
-          Navigator.popUntil(context, (route) => route.isFirst);
-
-          // Navegar al Home
-          _pageController.animateToPage(
-            0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-
-          print('✅ Redirección completada');
-        }
-        break;
-      }
-    }
-
-    if (!empresaEncontrada) {
-      print('⚠️ Empresa no encontrada inmediatamente, se actualizará en background');
-      _mostrarMensajeSeguro('La empresa se agregó correctamente y aparecerá pronto');
-    }
-  }
-
-  // ✅ MÉTODO SEGURO PARA SNACKBAR
-  void _mostrarSnackBarSeguro(String mensaje) {
-    if (mounted) {
-      mostrarSnackBarGlobal(context, mensaje);
-    }
-  }
-
-  // ✅ MÉTODO MEJORADO PARA MOSTRAR MENSAJES
-  void _mostrarMensajeSeguro(String mensaje) {
-    print('📢 Intentando mostrar mensaje: $mensaje');
-
-    if (mounted) {
-      print('✅ Widget montado, mostrando snackbar...');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          mostrarSnackBarGlobal(context, mensaje);
-        } else {
-          print('⚠️ Widget desmontado durante postFrameCallback, guardando mensaje pendiente');
-          _mensajePendiente = mensaje;
-        }
-      });
-    } else {
-      print('⚠️ Widget NO montado, guardando mensaje pendiente: $mensaje');
-      _mensajePendiente = mensaje;
-    }
-  }
-
-  // ✅ MÉTODO PARA ACTUALIZAR DATOS DESPUÉS DE AGREGAR EMPRESA
-  void _actualizarDatosDespuesDeAgregarEmpresa(String rutAgregado) {
-    print('🔄 Iniciando actualización de datos...');
-
-    // Usar un Future para no bloquear
-    Future.delayed(const Duration(seconds: 1), () async {
-      print('⏰ Ejecutando actualización retardada...');
-
-      try {
-        // 1. Actualizar datos del servidor
-        print('🌐 Actualizando desde servidor...');
-        await _verificarSesionActualizada();
-
-        // 2. Buscar y seleccionar la empresa
-        print('🎯 Buscando empresa: $rutAgregado');
-        final rutParseado = RutUtils.parseRut(rutAgregado);
-        final rutNumero = rutParseado['numero'] ?? '';
-        final rutDv = rutParseado['dv'] ?? '';
-
-        if (rutNumero.isEmpty || rutDv.isEmpty) {
-          print('❌ RUT inválido: $rutAgregado');
-          return;
-        }
-
-        final empresas = _currentUserData['empresas'] ?? [];
-        bool empresaEncontrada = false;
-
-        for (var empresa in empresas) {
-          final rutEmpresa = empresa['rut_empresa']?.toString() ?? '';
-          final dvEmpresa = empresa['dv_rut_empresa']?.toString() ?? '';
-
-          if (rutEmpresa == rutNumero && dvEmpresa == rutDv) {
-            final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? 'Nueva Empresa';
-            final tokenEmpresa = empresa['token_empresa'];
-
-            print('✅ Empresa encontrada: $nombreEmpresa (Token: $tokenEmpresa)');
-
-            if (mounted && tokenEmpresa != null && tokenEmpresa != _empresaSeleccionada) {
-              setState(() {
-                _empresaSeleccionada = tokenEmpresa;
-                empresaEncontrada = true;
-              });
-
-              // Actualizar animaciones
-              _actualizarValoresAnimados();
-              _iniciarAnimacion();
-              _verificarMostrarMensajeLineaCredito();
-
-              // Mostrar mensaje de confirmación
-              _mostrarMensajeSeguro('Empresa "$nombreEmpresa" seleccionada');
-
-              print('✅ Empresa seleccionada automáticamente');
-            }
-            break;
-          }
-        }
-
-        if (!empresaEncontrada && empresas.isNotEmpty) {
-          // Si no encontramos la empresa específica, seleccionar la primera
-          final primeraEmpresa = empresas[0];
-          final tokenPrimeraEmpresa = primeraEmpresa['token_empresa'];
-          final nombrePrimeraEmpresa = primeraEmpresa['nombre_empresa']?.toString() ?? 'Empresa';
-
-          if (mounted && tokenPrimeraEmpresa != null && tokenPrimeraEmpresa != _empresaSeleccionada) {
-            setState(() {
-              _empresaSeleccionada = tokenPrimeraEmpresa;
-            });
-
-            _mostrarMensajeSeguro('Seleccionada: $nombrePrimeraEmpresa');
-            print('⚠️ Empresa específica no encontrada, seleccionando primera disponible');
-          }
-        }
-
-        print('✅ Actualización completada');
-      } catch (e) {
-        print('❌ Error en actualización: $e');
-        _mostrarMensajeSeguro('Error al actualizar: ${e.toString().split(':').first}');
-      }
-    });
   }
 
   void _cambiarEmpresa(String nuevaEmpresaToken) {
@@ -1717,7 +1489,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     }
 
-    int nextIndex = (currentIndex + 1) % (empresas.length as int);
+    int nextIndex = (currentIndex + 1) % cantidadEmpresas;
     final siguienteEmpresa = empresas[nextIndex];
     final nuevaEmpresaToken = siguienteEmpresa['token_empresa'];
 
@@ -1763,7 +1535,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
         centerTitle: false,
         actions: [
-          // ✅ INDICADOR DE CARGA SEPARADO CUANDO SE ESTÁ AGREGANDO EMPRESA
           if (_isAgregandoEmpresa)
             Padding(
               padding: const EdgeInsets.only(right: 16),
@@ -1778,12 +1549,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
             ),
-          // ✅ SIEMPRE MOSTRAR LOS 3 PUNTITOS (NO SE REEMPLAZAN CON EL INDICADOR)
-          if (mostrarOpciones)
-            IconButton(
-              icon: Icon(Icons.more_vert, color: _blueDarkColor),
-              onPressed: _showOptionsMenu,
-              tooltip: 'Opciones',
+          if (mostrarOpciones && !_isAgregandoEmpresa)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ✅ Icono 1: Cambiar de empresa (flechas hacia los lados)
+                IconButton(
+                  icon: const Icon(Icons.swap_horiz),
+                  color: _blueDarkColor,
+                  onPressed: _cambiarDeEmpresa,
+                  tooltip: 'Cambiar de empresa',
+                ),
+
+                // ✅ Icono 2: Vista de autorizadores
+                IconButton(
+                  icon: const Icon(Icons.people_outline),
+                  color: _blueDarkColor,
+                  onPressed: _mostrarVistaAutorizadores,
+                  tooltip: 'Autorizadores',
+                ),
+
+                // ✅ Icono 3: Vista de empresas
+                IconButton(
+                  icon: Icon(Icons.business_outlined),
+                  color: _blueDarkColor,
+                  onPressed: _mostrarVistaEmpresas,
+                  tooltip: 'Empresas',
+                ),
+              ],
             ),
         ],
       ),
@@ -1927,5 +1720,285 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (rut.isNotEmpty && dv.isNotEmpty) return 'Empresa $rut-$dv';
 
     return 'Empresa desconocida';
+  }
+
+  // ✅ MÉTODO SEGURO PARA SNACKBAR
+  void _mostrarSnackBarSeguro(String mensaje) {
+    if (mounted) {
+      mostrarSnackBarGlobal(context, mensaje);
+    }
+  }
+
+  // ✅ MÉTODO MEJORADO PARA MOSTRAR MENSAJES
+  void _mostrarMensajeSeguro(String mensaje) {
+    print('📢 Intentando mostrar mensaje: $mensaje');
+
+    if (mounted) {
+      print('✅ Widget montado, mostrando snackbar...');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          mostrarSnackBarGlobal(context, mensaje);
+        } else {
+          print('⚠️ Widget desmontado durante postFrameCallback, guardando mensaje pendiente');
+          _mensajePendiente = mensaje;
+        }
+      });
+    } else {
+      print('⚠️ Widget NO montado, guardando mensaje pendiente: $mensaje');
+      _mensajePendiente = mensaje;
+    }
+  }
+
+  // ✅ MÉTODO PARA ACTUALIZAR DATOS DESPUÉS DE AGREGAR EMPRESA
+  void _actualizarDatosDespuesDeAgregarEmpresa(String rutAgregado) {
+    print('🔄 Iniciando actualización de datos...');
+
+    // Usar un Future para no bloquear
+    Future.delayed(const Duration(seconds: 1), () async {
+      print('⏰ Ejecutando actualización retardada...');
+
+      try {
+        // 1. Actualizar datos del servidor
+        print('🌐 Actualizando desde servidor...');
+        await _verificarSesionActualizada();
+
+        // 2. Buscar y seleccionar la empresa
+        print('🎯 Buscando empresa: $rutAgregado');
+        final rutParseado = RutUtils.parseRut(rutAgregado);
+
+        final empresas = _currentUserData['empresas'] ?? [];
+        for (var empresa in empresas) {
+          if (empresa['rut_empresa']?.toString() == rutParseado['numero'] &&
+              empresa['dv_rut_empresa']?.toString() == rutParseado['dv']) {
+
+            print('✅ Empresa encontrada: ${empresa['nombre_empresa']}');
+
+            if (mounted) {
+              setState(() {
+                _empresaSeleccionada = empresa['token_empresa'];
+              });
+
+              // Actualizar animaciones
+              _actualizarValoresAnimados();
+              _iniciarAnimacion();
+              _verificarMostrarMensajeLineaCredito();
+            }
+
+            break;
+          }
+        }
+
+        print('✅ Actualización completada');
+      } catch (e) {
+        print('❌ Error en actualización: $e');
+      }
+    });
+  }
+
+  // ✅ MÉTODO PARA SELECCIONAR EMPRESA RECIÉN AGREGADA
+  void _seleccionarEmpresaRecienAgregada(String rutAgregado) {
+    if (!mounted) return;
+
+    print('🎯 Intentando seleccionar empresa recién agregada: $rutAgregado');
+
+    final rutParseado = RutUtils.parseRut(rutAgregado);
+    final rutNumero = rutParseado['numero'] ?? '';
+    final rutDv = rutParseado['dv'] ?? '';
+
+    if (rutNumero.isEmpty || rutDv.isEmpty) return;
+
+    final empresas = _currentUserData['empresas'] ?? [];
+
+    for (var empresa in empresas) {
+      final rutEmpresa = empresa['rut_empresa']?.toString() ?? '';
+      final dvEmpresa = empresa['dv_rut_empresa']?.toString() ?? '';
+
+      if (rutEmpresa == rutNumero && dvEmpresa == rutDv) {
+        final tokenEmpresa = empresa['token_empresa'];
+        if (tokenEmpresa != null && tokenEmpresa != _empresaSeleccionada) {
+          print('✅ Empresa encontrada: ${empresa['nombre_empresa']}');
+
+          _empresaSeleccionada = tokenEmpresa;
+
+          return;
+        }
+      }
+    }
+
+    print('⚠️ Empresa no encontrada, seleccionando primera disponible');
+
+    if (empresas.isNotEmpty) {
+      final primeraEmpresa = empresas[0];
+      final tokenPrimeraEmpresa = primeraEmpresa['token_empresa'];
+
+      if (tokenPrimeraEmpresa != null && tokenPrimeraEmpresa != _empresaSeleccionada) {
+        _empresaSeleccionada = tokenPrimeraEmpresa;
+      }
+    }
+  }
+
+  // ✅ NUEVO ENFOQUE - MÉTODO SIMPLIFICADO Y ROBUSTO
+  Future<void> _agregarEmpresaNuevoEnfoque(String rut, String tipoRelacion) async {
+    if (_isAgregandoEmpresa) {
+      print('⚠️ Ya hay una operación en curso');
+      return;
+    }
+
+    print('🚀 NUEVO ENFOQUE: Iniciando proceso para agregar empresa: $rut');
+
+    // Marcar que estamos procesando
+    _isAgregandoEmpresa = true;
+
+    // Mostrar indicador en AppBar
+    if (mounted) {
+      setState(() {});
+    }
+
+    // ✅ VARIABLE PARA CONTROLAR LA OPERACIÓN
+    bool operacionExitosa = false;
+    String? mensajeResultado;
+
+    try {
+      // ✅ PASO 1: MOSTRAR DIALOGO INMEDIATAMENTE - USAR ROOT NAVIGATOR
+      print('🎬 Mostrando diálogo de carga...');
+
+      final Completer<void> loadingCompleter = Completer<void>();
+
+      // USAR showDialog DIRECTAMENTE con rootNavigator: true
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black54,
+        useRootNavigator: true, // ✅ CLAVE: Esto mantiene el diálogo en la raíz
+        builder: (context) {
+          return SimpleLoadingDialog(
+            message: 'Agregando empresa...',
+            completer: loadingCompleter,
+          );
+        },
+      );
+
+      // ✅ PASO 2: DAR TIEMPO PARA QUE EL DIALOGO SE MUESTRE
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // ✅ PASO 3: EJECUTAR LA LÓGICA CON UN TIMEOUT CONTROLADO
+      print('🔥 Ejecutando lógica de API con timeout...');
+
+      try {
+        // Obtener token FCM
+        await Firebase.initializeApp();
+        String? fcmToken = await FirebaseMessaging.instance.getToken();
+        final String deviceToken = fcmToken ?? 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
+
+        // Parsear RUN del comprador
+        final runData = RutUtils.parseRunFromUserData(_currentUserData);
+        final tokenComprador = _currentUserData['comprador']?['token_comprador']?.toString() ?? '';
+        final runComprador = runData['numero'] ?? '';
+        final dvRunComprador = runData['dv'] ?? '';
+
+        // Parsear RUT de la empresa
+        final rutParseado = RutUtils.parseRut(rut);
+        final rutEmpresa = rutParseado['numero'] ?? '';
+        final dvEmpresa = rutParseado['dv'] ?? '';
+
+        // Determinar tipo de relación
+        final representanteOautorizador = tipoRelacion.toLowerCase() == 'autorizador' ? '1' : '2';
+
+        // Request body
+        final requestBody = {
+          "token_comprador": tokenComprador,
+          "run_comprador": runComprador,
+          "dv_comprador": dvRunComprador,
+          "rut_empresa": rutEmpresa,
+          "dv_rut_empresa": dvEmpresa,
+          "represetante_o_autorizador": representanteOautorizador,
+          "token_dispositivo": deviceToken,
+        };
+
+        print('📦 Enviando request body...');
+
+        // Configurar timeout
+        final response = await http.post(
+          Uri.parse('${GlobalVariables.baseUrl}/AgregarEmpresaAComprador/api/v2/'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'api-key': GlobalVariables.apiKey,
+          },
+          body: json.encode(requestBody),
+        ).timeout(const Duration(seconds: 30));
+
+        print('✅ Respuesta recibida: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final responseData = json.decode(response.body);
+          print('📦 Response Data completo:');
+          print(responseData);
+
+          if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
+            print('🔐 Sesión expirada, reiniciando app...');
+            if (mounted) {
+              _reiniciarAplicacion(context);
+            }
+            return;
+          }
+
+          if (responseData['success'] == true) {
+            operacionExitosa = true;
+            mensajeResultado = responseData['message'] ?? responseData['mensaje'] ?? 'Empresa agregada exitosamente';
+            print('✅ API exitosa: $mensajeResultado');
+          } else {
+            mensajeResultado = responseData['message'] ?? responseData['error'] ?? 'Error al agregar empresa';
+            print('❌ API error: $mensajeResultado');
+          }
+        } else {
+          mensajeResultado = 'Error del servidor: ${response.statusCode}';
+          print('❌ HTTP error: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('❌ Error en API: $e');
+
+        if (e is TimeoutException) {
+          mensajeResultado = 'La empresa se está procesando. Se actualizará en unos momentos.';
+          operacionExitosa = true; // Consideramos éxito porque el timeout no significa fallo
+          print('⏰ Timeout - Mensaje especial mostrado');
+        } else {
+          mensajeResultado = 'Error de conexión: ${e.toString().split(':').first}';
+        }
+      }
+
+      // ✅ PASO 4: CERRAR DIALOGO Y MOSTRAR RESULTADO
+      print('🔒 Completando completer para cerrar diálogo...');
+      loadingCompleter.complete();
+
+      // Esperar a que el diálogo se cierre completamente
+      await Future.delayed(const Duration(milliseconds: 300));
+
+    } catch (e) {
+      print('❌ Error en flujo principal: $e');
+      mensajeResultado = 'Error en el proceso: ${e.toString().split(':').first}';
+    } finally {
+      // ✅ PASO 5: PROCESAR RESULTADO FINAL
+      print('🏁 Procesando resultado final...');
+
+      if (mensajeResultado != null) {
+        // Mostrar mensaje usando un enfoque seguro
+        _mostrarMensajeSeguro(mensajeResultado!);
+      }
+
+      if (operacionExitosa) {
+        // Si fue exitoso, actualizar datos
+        print('🔄 Actualizando datos después de éxito...');
+        _actualizarDatosDespuesDeAgregarEmpresa(rut);
+      }
+
+      // Limpiar estado
+      _isAgregandoEmpresa = false;
+
+      // Forzar rebuild si es posible
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 }

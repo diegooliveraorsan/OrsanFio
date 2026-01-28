@@ -306,10 +306,10 @@ packages:
     dependency: "direct dev"
     description:
       name: flutter_face_core_basic
-      sha256: "0bb2724b9f709ed132eaf1718fd1f3a2ea97ed20ef1fcbee02e9487902909fea"
+      sha256: "9f67442b395787a7ab58a99ef9b48c5b9073837c3bca90c777604474f9972a33"
       url: "https://pub.dev"
     source: hosted
-    version: "7.3.251-nightly"
+    version: "7.2.235"
   flutter_image_compress:
     dependency: "direct main"
     description:

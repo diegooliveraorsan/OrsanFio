@@ -85,9 +85,8 @@ class OptionsModal {
     required Map<String, dynamic> userData,
     required String? empresaSeleccionada,
     required Function(String) onCambiarEmpresa,
-    required Function(String, String) onAgregarEmpresa,
-    required Function(String) onAsignarAutorizador,
     required VoidCallback onMostrarAutorizadores,
+    required VoidCallback onMostrarNuevaEmpresa,
     required VoidCallback onReiniciarApp,
     required VoidCallback onActualizarVista,
   }) {
@@ -130,18 +129,14 @@ class OptionsModal {
 
               const SizedBox(height: 16),
 
+              // ✅ BOTÓN PARA NUEVA EMPRESA (REDIRIGE A PANTALLA COMPLETA)
               _buildOptionItem(
                 icon: Icons.add_business,
-                title: 'Añadir nueva empresa',
+                title: 'Agregar nueva empresa',
                 subtitle: 'Registrar nueva empresa con RUT',
                 onTap: () {
-                  Navigator.pop(context);
-                  _mostrarDialogoNuevaEmpresa(
-                    context: context,
-                    userData: userData,
-                    onAgregarEmpresa: onAgregarEmpresa,
-                    onReiniciarApp: onReiniciarApp,
-                  );
+                  Navigator.pop(context); // Cerrar el modal
+                  onMostrarNuevaEmpresa(); // ✅ Llamar al callback para mostrar pantalla
                 },
               ),
 
@@ -198,6 +193,25 @@ class OptionsModal {
       onActualizarAutorizadores: onActualizarAutorizadores,
       onVolver: onVolver,
       onReiniciarApp: onReiniciarApp,
+    );
+  }
+
+  // ✅ NUEVO: CREAR VISTA DE NUEVA EMPRESA
+  static Widget crearVistaNuevaEmpresa({
+    required BuildContext context,
+    required Map<String, dynamic> userData,
+    required Function(String, String) onAgregarEmpresa,
+    required VoidCallback onVolver,
+    required VoidCallback onReiniciarApp,
+    required VoidCallback onActualizarDashboard,
+  }) {
+    return _NuevaEmpresaScreen(
+      context: context,
+      userData: userData,
+      onAgregarEmpresa: onAgregarEmpresa,
+      onVolver: onVolver,
+      onReiniciarApp: onReiniciarApp,
+      onActualizarDashboard: onActualizarDashboard,
     );
   }
 
@@ -480,839 +494,6 @@ class OptionsModal {
     );
   }
 
-  static void _mostrarDialogoNuevaEmpresa({
-    required BuildContext context,
-    required Map<String, dynamic> userData,
-    required Function(String, String) onAgregarEmpresa,
-    required VoidCallback onReiniciarApp,
-  }) {
-    final TextEditingController rutController = TextEditingController();
-    bool rutValido = false;
-    String mensajeValidacion = '';
-    String? tipoRelacionSeleccionada;
-
-    showDialog(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.8,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        'Añadir Nueva Empresa',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _blueDarkColor,
-                        ),
-                      ),
-                    ),
-
-                    Container(height: 1, color: Colors.grey.shade300),
-
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Formato: sin puntos, con guión y dígito verificador',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            TextFormField(
-                              controller: rutController,
-                              decoration: InputDecoration(
-                                labelText: 'RUT (ej: 12345678-9)',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey.shade50,
-                                suffixIcon: rutController.text.isNotEmpty
-                                    ? Icon(
-                                  rutValido ? Icons.check_circle : Icons.error,
-                                  color: rutValido ? Colors.green : Colors.red,
-                                )
-                                    : null,
-                              ),
-                              onChanged: (value) {
-                                final formattedRut = _formatRut(value);
-                                if (formattedRut != value) {
-                                  rutController.value = TextEditingValue(
-                                    text: formattedRut,
-                                    selection: TextSelection.collapsed(offset: formattedRut.length),
-                                  );
-                                }
-
-                                final valido = _validateRut(formattedRut);
-                                String mensajeDuplicado = '';
-
-                                if (valido) {
-                                  final rutParseado = _parseRut(formattedRut);
-                                  final rutEmpresa = rutParseado['numero'] ?? '';
-                                  final dvEmpresa = rutParseado['dv'] ?? '';
-
-                                  if (_rutEmpresaYaExiste(userData, rutEmpresa, dvEmpresa)) {
-                                    mensajeDuplicado = 'Esta empresa ya está registrada';
-                                  }
-                                }
-
-                                setState(() {
-                                  rutValido = valido && mensajeDuplicado.isEmpty;
-                                  mensajeValidacion = mensajeDuplicado.isNotEmpty
-                                      ? mensajeDuplicado
-                                      : (valido ? 'RUT válido' : 'RUT inválido');
-                                });
-                              },
-                            ),
-
-                            if (mensajeValidacion.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                mensajeValidacion,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: rutValido ? Colors.green : Colors.red,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-
-                            const SizedBox(height: 20),
-                            _buildSelectorTipoRelacionVertical(
-                              tipoSeleccionado: tipoRelacionSeleccionada,
-                              onTipoCambiado: (String tipo) {
-                                setState(() {
-                                  tipoRelacionSeleccionada = tipo;
-                                });
-                              },
-                            ),
-
-                            const SizedBox(height: 8),
-                            if (tipoRelacionSeleccionada != null)
-                              _buildInfoTipoRelacion(tipoRelacionSeleccionada!),
-
-                            const SizedBox(height: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    Container(height: 1, color: Colors.grey.shade300),
-
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          ElevatedButton(
-                            onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _blueDarkColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text('Cancelar'),
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton(
-                            onPressed: (rutValido && tipoRelacionSeleccionada != null)
-                                ? () async {
-                              final rut = rutController.text.trim();
-                              Navigator.of(context, rootNavigator: true).pop();
-
-                              try {
-                                await _agregarEmpresaApi(
-                                  context: context,
-                                  userData: userData,
-                                  rut: rut,
-                                  tipoRelacion: tipoRelacionSeleccionada!,
-                                  onAgregarEmpresa: onAgregarEmpresa,
-                                  onReiniciarApp: onReiniciarApp,
-                                );
-                              } catch (e) {
-                                mostrarSnackBar(context, 'Error al agregar empresa: $e');
-                              }
-                            }
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _blueDarkColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text('Agregar'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ✅ MÉTODO ACTUALIZADO: API v2 CON TOKEN DISPOSITIVO PARA AGREGAR EMPRESA
-  static Future<void> _agregarEmpresaApi({
-    required BuildContext context,
-    required Map<String, dynamic> userData,
-    required String rut,
-    required String tipoRelacion,
-    required Function(String, String) onAgregarEmpresa,
-    required VoidCallback onReiniciarApp,
-  }) async {
-    try {
-      // ✅ OBTENER TOKEN DEL DISPOSITIVO (FCM) - CORREGIDO
-      print('🔄 Obteniendo token del dispositivo...');
-      final String deviceToken = await FCMTokenManager.getDeviceToken();
-
-      final tokenComprador = userData['comprador']?['token_comprador']?.toString() ?? '';
-
-      if (tokenComprador.isEmpty) {
-        mostrarSnackBar(context, 'No se pudo obtener el token del comprador');
-        return;
-      }
-
-      // Parsear RUT
-      final rutParseado = _parseRut(rut);
-      final rutEmpresa = rutParseado['numero'] ?? '';
-      final dvEmpresa = rutParseado['dv'] ?? '';
-
-      if (rutEmpresa.isEmpty || dvEmpresa.isEmpty) {
-        mostrarSnackBar(context, 'RUT inválido');
-        return;
-      }
-
-      print('🔄 Iniciando llamada a API AgregarEmpresaComprador (v2)...');
-      print('📤 Request body:');
-      print('  - token_comprador: $tokenComprador');
-      print('  - rut_empresa: $rutEmpresa');
-      print('  - dv_rut_empresa: $dvEmpresa');
-      print('  - tipo_relacion: $tipoRelacion');
-      print('  - token_dispositivo: ${deviceToken.substring(0, 20)}...');
-      print('🌐 URL: ${GlobalVariables.baseUrl}/AgregarEmpresaComprador/api/v2/');
-
-      final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/AgregarEmpresaComprador/api/v2/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'api-key': GlobalVariables.apiKey,
-        },
-        body: json.encode({
-          "token_comprador": tokenComprador,
-          "rut_empresa": rutEmpresa,
-          "dv_rut_empresa": dvEmpresa,
-          "tipo_relacion": tipoRelacion,
-          "token_dispositivo": deviceToken,
-        }),
-      ).timeout(const Duration(seconds: 15));
-
-      print('📥 Response recibido:');
-      print('  - Status Code: ${response.statusCode}');
-      print('  - Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-
-        // ✅ VERIFICAR SI LA SESIÓN HA EXPIRADO
-        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
-          mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
-          reiniciarAplicacion(context);
-          return;
-        }
-
-        if (responseData['success'] == true) {
-          mostrarSnackBar(context, 'Empresa agregada exitosamente');
-          onAgregarEmpresa(rut, tipoRelacion);
-        } else {
-          final mensajeError = responseData['message'] ?? responseData['error'] ?? 'Error al agregar empresa';
-          mostrarSnackBar(context, mensajeError);
-        }
-      } else if (response.statusCode == 401) {
-        // ✅ SESIÓN EXPIRADA POR STATUS 401
-        print('🔐 Sesión expirada (401 Unauthorized)');
-        mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
-        reiniciarAplicacion(context);
-      } else {
-        print('❌ Error en API AgregarEmpresaComprador - Status: ${response.statusCode}');
-        mostrarSnackBar(context, 'Error al agregar empresa: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('❌ Error agregando empresa: $e');
-      mostrarSnackBar(context, 'Error de conexión: $e');
-    }
-  }
-
-  static Widget _buildSelectorTipoRelacionVertical({
-    required String? tipoSeleccionado,
-    required Function(String) onTipoCambiado,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Tipo de relación con la empresa',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade800,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        _buildOpcionRelacionVertical(
-          titulo: 'Autorizador',
-          subtitulo: 'Persona autorizada para realizar compras',
-          icono: Icons.person_outline,
-          seleccionado: tipoSeleccionado == 'autorizador',
-          onTap: () {
-            onTipoCambiado('autorizador');
-          },
-        ),
-
-        const SizedBox(height: 12),
-
-        _buildOpcionRelacionVertical(
-          titulo: 'Representante',
-          subtitulo: 'Representante legal de la empresa',
-          icono: Icons.badge_outlined,
-          seleccionado: tipoSeleccionado == 'representante',
-          onTap: () {
-            onTipoCambiado('representante');
-          },
-        ),
-      ],
-    );
-  }
-
-  static Widget _buildOpcionRelacionVertical({
-    required String titulo,
-    required String subtitulo,
-    required IconData icono,
-    required bool seleccionado,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: seleccionado
-                ? _blueDarkColor.withOpacity(0.1)
-                : Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: seleccionado ? _blueDarkColor : Colors.grey.shade300,
-              width: seleccionado ? 2 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.3),
-                blurRadius: 3,
-                offset: const Offset(0, 2),
-                spreadRadius: 0,
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: seleccionado ? _blueDarkColor : Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: seleccionado ? _blueDarkColor : Colors.grey.shade400,
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  icono,
-                  color: seleccionado ? Colors.white : Colors.grey.shade600,
-                  size: 20,
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          titulo,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: seleccionado ? _blueDarkColor : Colors.grey.shade800,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (seleccionado)
-                          Container(
-                            width: 20,
-                            height: 20,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF4CAF50),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      subtitulo,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: seleccionado
-                            ? _blueDarkColor.withOpacity(0.8)
-                            : Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-    );
-  }
-
-  static Widget _buildInfoTipoRelacion(String tipoRelacion) {
-    final Map<String, Map<String, String>> infoTipos = {
-      'autorizador': {
-        'titulo': 'Autorizador',
-        'descripcion':
-        'Eres una persona autorizada para realizar compras en nombre de la empresa.',
-        'permisos': '• Autorizar compras\n• Consultar historial\n• Ver líneas de crédito',
-      },
-      'representante': {
-        'titulo': 'Representante Legal',
-        'descripcion':
-        'Eres el representante legal de la empresa con permisos administrativos completos.',
-        'permisos': '• Todas las funciones de autorizador\n• Gestionar autorizadores',
-      },
-    };
-
-    final info = infoTipos[tipoRelacion]!;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _blueDarkColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: _blueDarkColor.withOpacity(0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: _blueDarkColor,
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                info['titulo']!,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _blueDarkColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            info['descripcion']!,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            info['permisos']!,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ DIÁLOGO PARA NUEVO AUTORIZADOR
-  static void _mostrarDialogoNuevoAutorizador({
-    required BuildContext context,
-    required Map<String, dynamic> userData,
-    required Function(String) onAsignarAutorizador,
-    required VoidCallback onReiniciarApp,
-    required List<Map<String, dynamic>> autorizadoresExistentes,
-    required VoidCallback onActualizarAutorizadores,
-  }) {
-    final TextEditingController runController = TextEditingController();
-    bool runValido = false;
-    String mensajeValidacion = '';
-
-    showDialog(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Asignar Nuevo Autorizador',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _blueDarkColor,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Formato: sin puntos, con guión y dígito verificador',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: runController,
-                      decoration: InputDecoration(
-                        labelText: 'RUN (ej: 12345678-9)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        suffixIcon: runController.text.isNotEmpty
-                            ? Icon(
-                          runValido ? Icons.check_circle : Icons.error,
-                          color: runValido ? Colors.green : Colors.red,
-                        )
-                            : null,
-                      ),
-                      onChanged: (value) {
-                        final formattedRun = _formatRut(value);
-                        if (formattedRun != value) {
-                          runController.value = TextEditingValue(
-                            text: formattedRun,
-                            selection: TextSelection.collapsed(offset: formattedRun.length),
-                          );
-                        }
-
-                        final valido = _validateRut(formattedRun);
-
-                        if (valido) {
-                          // VERIFICAR SI ES EL RUN DEL USUARIO ACTUAL
-                          final comprador = userData['comprador'];
-                          if (comprador != null) {
-                            final runComprador = comprador['run_comprador']?.toString() ?? '';
-                            final dvComprador = comprador['dv_run_comprador']?.toString() ?? '';
-                            final runCompletoComprador = '$runComprador-$dvComprador';
-                            final runFormateadoComprador = _formatRut(runCompletoComprador);
-
-                            if (formattedRun == runFormateadoComprador) {
-                              setState(() {
-                                runValido = false;
-                                mensajeValidacion = 'No puedes usar tu propio RUN';
-                              });
-                              return;
-                            }
-                          }
-
-                          // VERIFICAR SI EL RUN YA ESTÁ REGISTRADO
-                          final runParseado = _parseRut(formattedRun);
-                          final runNumero = runParseado['numero'] ?? '';
-                          final runDv = runParseado['dv'] ?? '';
-
-                          bool yaRegistrado = false;
-                          for (var autorizador in autorizadoresExistentes) {
-                            final runExistente = autorizador['run_comprador']?.toString() ?? '';
-                            final dvExistente = autorizador['dv_run_comprador']?.toString() ?? '';
-
-                            if (runExistente == runNumero && dvExistente == runDv) {
-                              yaRegistrado = true;
-                              break;
-                            }
-
-                            final runCompletoExistente = '$runExistente-$dvExistente';
-                            if (_formatRut(runCompletoExistente) == formattedRun) {
-                              yaRegistrado = true;
-                              break;
-                            }
-                          }
-
-                          if (yaRegistrado) {
-                            setState(() {
-                              runValido = false;
-                              mensajeValidacion = 'Este RUN ya está registrado como autorizador';
-                            });
-                            return;
-                          }
-                        }
-
-                        setState(() {
-                          runValido = valido;
-                          mensajeValidacion = valido ? 'RUN válido y disponible' : 'RUN inválido';
-                        });
-                      },
-                    ),
-                    if (mensajeValidacion.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        mensajeValidacion,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: runValido ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _blueDarkColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Cancelar'),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: runValido
-                              ? () async {
-                            final run = runController.text.trim();
-                            print('✅ Confirmado: Agregando autorizador con RUN: $run');
-
-                            // GUARDAR EL CONTEXTO ANTES DE CERRAR EL DIÁLOGO
-                            final BuildContext dialogContext = context;
-
-                            // Cerrar el diálogo primero
-                            Navigator.of(dialogContext, rootNavigator: true).pop();
-
-                            try {
-                              await _asignarAutorizadorApi(
-                                context: dialogContext,
-                                userData: userData,
-                                run: run,
-                                onAsignarAutorizador: onAsignarAutorizador,
-                                onReiniciarApp: onReiniciarApp,
-                                onActualizarAutorizadores: onActualizarAutorizadores,
-                              );
-                            } catch (e) {
-                              print('❌ Error en diálogo: $e');
-                              // No mostrar snackbar aquí - ya se maneja en la API
-                            }
-                          }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _blueDarkColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Asignar'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ✅ MÉTODO CORREGIDO: API PARA ASIGNAR AUTORIZADOR
-  static Future<void> _asignarAutorizadorApi({
-    required BuildContext context,
-    required Map<String, dynamic> userData,
-    required String run,
-    required Function(String) onAsignarAutorizador,
-    required VoidCallback onReiniciarApp,
-    required VoidCallback onActualizarAutorizadores,
-  }) async {
-    print('══════════════════════════════════════════════════════════════');
-    print('🎯 INICIANDO API _asignarAutorizadorApi');
-    print('══════════════════════════════════════════════════════════════');
-
-    try {
-      // OBTENER TOKEN DEL DISPOSITIVO
-      print('🔄 Obteniendo token del dispositivo...');
-      final String deviceToken = await FCMTokenManager.getDeviceToken();
-
-      final tokenComprador = userData['comprador']?['token_comprador']?.toString() ?? '';
-      final runComprador = userData['comprador']?['run_comprador']?.toString() ?? '';
-      final dvRunComprador = userData['comprador']?['dv_run_comprador']?.toString() ?? '';
-
-      if (tokenComprador.isEmpty || runComprador.isEmpty || dvRunComprador.isEmpty) {
-        print('❌ Faltan datos del comprador');
-        return;
-      }
-
-      // Obtener la empresa seleccionada
-      final empresas = userData['empresas'] ?? [];
-      final empresaSeleccionada = empresas.firstWhere(
-            (emp) => emp['seleccionada'] == true,
-        orElse: () => empresas.isNotEmpty ? empresas[0] : {},
-      );
-
-      if (empresaSeleccionada.isEmpty) {
-        print('❌ No hay empresa seleccionada');
-        return;
-      }
-
-      final rutEmpresa = empresaSeleccionada['rut_empresa']?.toString() ?? '';
-      final dvEmpresa = empresaSeleccionada['dv_rut_empresa']?.toString() ?? '';
-
-      // Parsear RUN del autorizador
-      final runParseado = _parseRut(run);
-      final runAutorizador = runParseado['numero'] ?? '';
-      final dvRunAutorizador = runParseado['dv'] ?? '';
-
-      if (runAutorizador.isEmpty || dvRunAutorizador.isEmpty) {
-        print('❌ RUN inválido');
-        return;
-      }
-
-      // Preparar request
-      final requestBody = {
-        "token_representante": tokenComprador,
-        "run_autorizador": runAutorizador,
-        "dv_autorizador": dvRunAutorizador,
-        "rut_empresa": rutEmpresa,
-        "dv_empresa": dvEmpresa,
-        "token_dispositivo": deviceToken,
-      };
-
-      print('📡 Enviando request a la API...');
-      final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/CrearAutorizador/api/v2/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'api-key': GlobalVariables.apiKey,
-        },
-        body: json.encode(requestBody),
-      ).timeout(const Duration(seconds: 15));
-
-      print('📡 Response recibido: Status ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-
-        // VERIFICAR SI LA SESIÓN HA EXPIRADO
-        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
-          print('🔐 Sesión expirada');
-          return;
-        }
-
-        if (responseData['success'] == true) {
-          final mensaje = responseData['message'] ?? 'Autorizador asignado exitosamente';
-          print('✅ ÉXITO: $mensaje');
-
-          // EJECUTAR EL CALLBACK DEL AUTORIZADOR
-          onAsignarAutorizador(run);
-
-          // LLAMAR AL CALLBACK PARA ACTUALIZAR LA LISTA
-          if (onActualizarAutorizadores != null) {
-            print('🔄 Ejecutando onActualizarAutorizadores...');
-            onActualizarAutorizadores();
-          }
-        } else {
-          final mensajeError = responseData['message'] ?? responseData['error'] ?? 'Error al asignar autorizador';
-          print('❌ ERROR API: $mensajeError');
-        }
-      } else if (response.statusCode == 401) {
-        print('🔐 Sesión expirada (401 Unauthorized)');
-      } else {
-        print('❌ ERROR HTTP: Status ${response.statusCode}');
-      }
-    } catch (e) {
-      print('❌ EXCEPCIÓN: Error en _asignarAutorizadorApi: $e');
-    }
-  }
-
   // Métodos auxiliares para RUT
   static String _formatRut(String rut) {
     String cleanRut = rut.replaceAll('.', '').replaceAll('-', '');
@@ -1339,15 +520,25 @@ class OptionsModal {
     try {
       String cleanRut = rut.replaceAll('.', '').replaceAll('-', '').toUpperCase();
 
-      if (cleanRut.length < 9) return false;
+      // Verificar longitud mínima
+      if (cleanRut.length < 8) return false;
 
       String numero = cleanRut.substring(0, cleanRut.length - 1);
       String dv = cleanRut.substring(cleanRut.length - 1);
 
-      if (numero.length < 8) return false;
+      // Verificar que el número tenga al menos 7 dígitos
+      if (numero.length < 7) return false;
 
+      // Verificar que el número sea válido
       if (int.tryParse(numero) == null) return false;
 
+      // ✅ NUEVA VALIDACIÓN: El RUT debe ser mayor o igual a 1.000.000
+      int rutNumerico = int.parse(numero);
+      if (rutNumerico < 1000000) {
+        return false;
+      }
+
+      // Validar dígito verificador
       String expectedDv = _calculateDv(numero);
       return dv == expectedDv;
     } catch (e) {
@@ -1410,6 +601,546 @@ class OptionsModal {
     } catch (e) {
       return false;
     }
+  }
+}
+
+// ✅ CLASE PARA LA PANTALLA DE NUEVA EMPRESA
+class _NuevaEmpresaScreen extends StatefulWidget {
+  final BuildContext context;
+  final Map<String, dynamic> userData;
+  final Function(String, String) onAgregarEmpresa;
+  final VoidCallback onVolver;
+  final VoidCallback onReiniciarApp;
+  final VoidCallback onActualizarDashboard;
+
+  const _NuevaEmpresaScreen({
+    required this.context,
+    required this.userData,
+    required this.onAgregarEmpresa,
+    required this.onVolver,
+    required this.onReiniciarApp,
+    required this.onActualizarDashboard,
+  });
+
+  @override
+  __NuevaEmpresaScreenState createState() => __NuevaEmpresaScreenState();
+}
+
+class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
+  final TextEditingController _rutController = TextEditingController();
+  String? _tipoRelacionSeleccionada;
+  bool _isLoading = false;
+  bool _rutValido = false;
+  String _mensajeValidacion = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: _blueDarkColor),
+          onPressed: () {
+            widget.onVolver();
+          },
+        ),
+        title: Text(
+          'Agregar nueva empresa',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: _blueDarkColor,
+          ),
+        ),
+      ),
+      body: _buildContent(),
+    );
+  }
+
+  Widget _buildContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ✅ FORMULARIO DE RUT
+          _buildRutForm(),
+
+          const SizedBox(height: 24),
+
+          // ✅ SELECTOR DE TIPO DE RELACIÓN
+          _buildSelectorTipoRelacion(),
+
+          if (_tipoRelacionSeleccionada != null) ...[
+            const SizedBox(height: 16),
+            _buildInfoTipoRelacion(_tipoRelacionSeleccionada!),
+          ],
+
+          const SizedBox(height: 32),
+
+          // ✅ BOTÓN DE AGREGAR
+          _buildBotonAgregar(),
+
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRutForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'RUT de la empresa',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Formato: con puntos y guión (ej: 12.345.678-9)',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _rutController,
+          decoration: InputDecoration(
+            labelText: 'RUT (ej: 12.345.678-9)',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            filled: true,
+            fillColor: Colors.grey.shade50,
+            suffixIcon: _rutController.text.isNotEmpty
+                ? Icon(
+              _rutValido ? Icons.check_circle : Icons.error,
+              color: _rutValido ? Colors.green : Colors.red,
+            )
+                : null,
+          ),
+          onChanged: (value) {
+            final formattedRut = OptionsModal._formatRut(value);
+            if (formattedRut != value) {
+              _rutController.value = TextEditingValue(
+                text: formattedRut,
+                selection: TextSelection.collapsed(offset: formattedRut.length),
+              );
+            }
+
+            final valido = OptionsModal._validateRut(formattedRut);
+            String mensajeDuplicado = '';
+
+            if (valido) {
+              final rutParseado = OptionsModal._parseRut(formattedRut);
+              final rutEmpresa = rutParseado['numero'] ?? '';
+              final dvEmpresa = rutParseado['dv'] ?? '';
+
+              if (OptionsModal._rutEmpresaYaExiste(widget.userData, rutEmpresa, dvEmpresa)) {
+                mensajeDuplicado = 'Esta empresa ya está registrada';
+              }
+            }
+
+            setState(() {
+              _rutValido = valido && mensajeDuplicado.isEmpty;
+              _mensajeValidacion = mensajeDuplicado.isNotEmpty
+                  ? mensajeDuplicado
+                  : (valido ? 'RUT válido' : 'RUT inválido');
+            });
+          },
+        ),
+
+        if (_mensajeValidacion.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            _mensajeValidacion,
+            style: TextStyle(
+              fontSize: 12,
+              color: _rutValido ? Colors.green : Colors.red,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSelectorTipoRelacion() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tipo de relación con la empresa',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade800,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // ✅ OPCIÓN AUTORIZADOR
+        InkWell(
+          onTap: () {
+            setState(() {
+              _tipoRelacionSeleccionada = 'autorizador';
+            });
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: _tipoRelacionSeleccionada == 'autorizador'
+                  ? _blueDarkColor.withOpacity(0.1)
+                  : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _tipoRelacionSeleccionada == 'autorizador'
+                    ? _blueDarkColor
+                    : Colors.grey.shade300,
+                width: _tipoRelacionSeleccionada == 'autorizador' ? 2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.3),
+                  blurRadius: 3,
+                  offset: const Offset(0, 2),
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _tipoRelacionSeleccionada == 'autorizador'
+                        ? _blueDarkColor
+                        : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _tipoRelacionSeleccionada == 'autorizador'
+                          ? _blueDarkColor
+                          : Colors.grey.shade400,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.person_outline,
+                    color: _tipoRelacionSeleccionada == 'autorizador'
+                        ? Colors.white
+                        : Colors.grey.shade600,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Autorizador',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _tipoRelacionSeleccionada == 'autorizador'
+                                  ? _blueDarkColor
+                                  : Colors.grey.shade800,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (_tipoRelacionSeleccionada == 'autorizador')
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF4CAF50),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Persona autorizada para realizar compras',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _tipoRelacionSeleccionada == 'autorizador'
+                              ? _blueDarkColor.withOpacity(0.8)
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // ✅ OPCIÓN REPRESENTANTE
+        InkWell(
+          onTap: () {
+            setState(() {
+              _tipoRelacionSeleccionada = 'representante';
+            });
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _tipoRelacionSeleccionada == 'representante'
+                  ? _blueDarkColor.withOpacity(0.1)
+                  : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _tipoRelacionSeleccionada == 'representante'
+                    ? _blueDarkColor
+                    : Colors.grey.shade300,
+                width: _tipoRelacionSeleccionada == 'representante' ? 2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.3),
+                  blurRadius: 3,
+                  offset: const Offset(0, 2),
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _tipoRelacionSeleccionada == 'representante'
+                        ? _blueDarkColor
+                        : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _tipoRelacionSeleccionada == 'representante'
+                          ? _blueDarkColor
+                          : Colors.grey.shade400,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.badge_outlined,
+                    color: _tipoRelacionSeleccionada == 'representante'
+                        ? Colors.white
+                        : Colors.grey.shade600,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Representante',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _tipoRelacionSeleccionada == 'representante'
+                                  ? _blueDarkColor
+                                  : Colors.grey.shade800,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (_tipoRelacionSeleccionada == 'representante')
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF4CAF50),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Representante legal de la empresa',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _tipoRelacionSeleccionada == 'representante'
+                              ? _blueDarkColor.withOpacity(0.8)
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoTipoRelacion(String tipoRelacion) {
+    final Map<String, Map<String, String>> infoTipos = {
+      'autorizador': {
+        'titulo': 'Autorizador',
+        'descripcion':
+        'Eres una persona autorizada para realizar compras en nombre de la empresa.',
+        'permisos': '• Autorizar compras\n• Consultar historial\n• Ver líneas de crédito',
+      },
+      'representante': {
+        'titulo': 'Representante Legal',
+        'descripcion':
+        'Eres el representante legal de la empresa con permisos administrativos completos.',
+        'permisos': '• Todas las funciones de autorizador\n• Gestionar autorizadores',
+      },
+    };
+
+    final info = infoTipos[tipoRelacion]!;
+
+    return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _blueDarkColor.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: _blueDarkColor.withOpacity(0.2),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 2,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: _blueDarkColor,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  info['titulo']!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _blueDarkColor,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              info['descripcion']!,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              info['permisos']!,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+  Widget _buildBotonAgregar() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: (_rutValido && _tipoRelacionSeleccionada != null && !_isLoading)
+            ? () async {
+          setState(() {
+            _isLoading = true;
+          });
+
+          try {
+            final rut = _rutController.text.trim();
+            final tipoRelacion = _tipoRelacionSeleccionada!;
+
+            // ✅ LLAMAR AL MÉTODO DEL DASHBOARD
+            await widget.onAgregarEmpresa(rut, tipoRelacion);
+
+            // ✅ ACTUALIZAR EL DASHBOARD
+            widget.onActualizarDashboard();
+
+            // ✅ VOLVER ATRÁS
+            widget.onVolver();
+
+          } catch (e) {
+            mostrarSnackBar(widget.context, 'Error: $e');
+          } finally {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
+          }
+        }
+            : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _blueDarkColor,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 2,
+        ),
+        child: _isLoading
+            ? SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.white,
+          ),
+        )
+            : const Text(
+          'Agregar empresa',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1745,13 +1476,13 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
   void _mostrarDialogoAgregarAutorizador() {
     print('🔍 Abriendo diálogo para agregar autorizador');
 
-    OptionsModal._mostrarDialogoNuevoAutorizador(
+    _mostrarDialogoNuevoAutorizador(
       context: context,
       userData: widget.userData,
       onAsignarAutorizador: widget.onAsignarAutorizador,
       onReiniciarApp: widget.onReiniciarApp,
       autorizadoresExistentes: _autorizadores,
-      onActualizarAutorizadores: _recargarLista, // ← MÁS SIMPLE Y EFECTIVO
+      onActualizarAutorizadores: _recargarLista,
     );
   }
 
@@ -2215,5 +1946,318 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         ],
       ),
     );
+  }
+
+  // ✅ MÉTODO PARA MOSTRAR DIÁLOGO DE NUEVO AUTORIZADOR
+  void _mostrarDialogoNuevoAutorizador({
+    required BuildContext context,
+    required Map<String, dynamic> userData,
+    required Function(String) onAsignarAutorizador,
+    required VoidCallback onReiniciarApp,
+    required List<Map<String, dynamic>> autorizadoresExistentes,
+    required VoidCallback onActualizarAutorizadores,
+  }) {
+    final TextEditingController runController = TextEditingController();
+    bool runValido = false;
+    String mensajeValidacion = '';
+
+    showDialog(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Asignar Nuevo Autorizador',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _blueDarkColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Formato: sin puntos, con guión y dígito verificador',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: runController,
+                      decoration: InputDecoration(
+                        labelText: 'RUN (ej: 12345678-9)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        suffixIcon: runController.text.isNotEmpty
+                            ? Icon(
+                          runValido ? Icons.check_circle : Icons.error,
+                          color: runValido ? Colors.green : Colors.red,
+                        )
+                            : null,
+                      ),
+                      onChanged: (value) {
+                        final formattedRun = OptionsModal._formatRut(value);
+                        if (formattedRun != value) {
+                          runController.value = TextEditingValue(
+                            text: formattedRun,
+                            selection: TextSelection.collapsed(offset: formattedRun.length),
+                          );
+                        }
+
+                        final valido = OptionsModal._validateRut(formattedRun);
+
+                        if (valido) {
+                          // VERIFICAR SI ES EL RUN DEL USUARIO ACTUAL
+                          final comprador = userData['comprador'];
+                          if (comprador != null) {
+                            final runComprador = comprador['run_comprador']?.toString() ?? '';
+                            final dvComprador = comprador['dv_run_comprador']?.toString() ?? '';
+                            final runCompletoComprador = '$runComprador-$dvComprador';
+                            final runFormateadoComprador = OptionsModal._formatRut(runCompletoComprador);
+
+                            if (formattedRun == runFormateadoComprador) {
+                              setState(() {
+                                runValido = false;
+                                mensajeValidacion = 'No puedes usar tu propio RUN';
+                              });
+                              return;
+                            }
+                          }
+
+                          // VERIFICAR SI EL RUN YA ESTÁ REGISTRADO
+                          final runParseado = OptionsModal._parseRut(formattedRun);
+                          final runNumero = runParseado['numero'] ?? '';
+                          final runDv = runParseado['dv'] ?? '';
+
+                          bool yaRegistrado = false;
+                          for (var autorizador in autorizadoresExistentes) {
+                            final runExistente = autorizador['run_comprador']?.toString() ?? '';
+                            final dvExistente = autorizador['dv_run_comprador']?.toString() ?? '';
+
+                            if (runExistente == runNumero && dvExistente == runDv) {
+                              yaRegistrado = true;
+                              break;
+                            }
+
+                            final runCompletoExistente = '$runExistente-$dvExistente';
+                            if (OptionsModal._formatRut(runCompletoExistente) == formattedRun) {
+                              yaRegistrado = true;
+                              break;
+                            }
+                          }
+
+                          if (yaRegistrado) {
+                            setState(() {
+                              runValido = false;
+                              mensajeValidacion = 'Este RUN ya está registrado como autorizador';
+                            });
+                            return;
+                          }
+                        }
+
+                        setState(() {
+                          runValido = valido;
+                          mensajeValidacion = valido ? 'RUN válido y disponible' : 'RUN inválido';
+                        });
+                      },
+                    ),
+                    if (mensajeValidacion.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        mensajeValidacion,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: runValido ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _blueDarkColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: runValido
+                              ? () async {
+                            final run = runController.text.trim();
+                            print('✅ Confirmado: Agregando autorizador con RUN: $run');
+
+                            // GUARDAR EL CONTEXTO ANTES DE CERRAR EL DIÁLOGO
+                            final BuildContext dialogContext = context;
+
+                            // Cerrar el diálogo primero
+                            Navigator.of(dialogContext, rootNavigator: true).pop();
+
+                            try {
+                              await _asignarAutorizadorApi(
+                                context: dialogContext,
+                                userData: userData,
+                                run: run,
+                                onAsignarAutorizador: onAsignarAutorizador,
+                                onReiniciarApp: onReiniciarApp,
+                                onActualizarAutorizadores: onActualizarAutorizadores,
+                              );
+                            } catch (e) {
+                              print('❌ Error en diálogo: $e');
+                              // No mostrar snackbar aquí - ya se maneja en la API
+                            }
+                          }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _blueDarkColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Asignar'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ✅ MÉTODO PARA ASIGNAR AUTORIZADOR
+  Future<void> _asignarAutorizadorApi({
+    required BuildContext context,
+    required Map<String, dynamic> userData,
+    required String run,
+    required Function(String) onAsignarAutorizador,
+    required VoidCallback onReiniciarApp,
+    required VoidCallback onActualizarAutorizadores,
+  }) async {
+    print('══════════════════════════════════════════════════════════════');
+    print('🎯 INICIANDO API _asignarAutorizadorApi');
+    print('══════════════════════════════════════════════════════════════');
+
+    try {
+      // OBTENER TOKEN DEL DISPOSITIVO
+      print('🔄 Obteniendo token del dispositivo...');
+      final String deviceToken = await FCMTokenManager.getDeviceToken();
+
+      final tokenComprador = userData['comprador']?['token_comprador'] ?? '';
+      final runComprador = userData['comprador']?['run_comprador']?.toString() ?? '';
+      final dvRunComprador = userData['comprador']?['dv_run_comprador']?.toString() ?? '';
+
+      if (tokenComprador.isEmpty || runComprador.isEmpty || dvRunComprador.isEmpty) {
+        print('❌ Faltan datos del comprador');
+        return;
+      }
+
+      // Obtener la empresa seleccionada
+      final empresas = userData['empresas'] ?? [];
+      final empresaSeleccionada = empresas.firstWhere(
+            (emp) => emp['seleccionada'] == true,
+        orElse: () => empresas.isNotEmpty ? empresas[0] : {},
+      );
+
+      if (empresaSeleccionada.isEmpty) {
+        print('❌ No hay empresa seleccionada');
+        return;
+      }
+
+      final rutEmpresa = empresaSeleccionada['rut_empresa']?.toString() ?? '';
+      final dvEmpresa = empresaSeleccionada['dv_rut_empresa']?.toString() ?? '';
+
+      // Parsear RUN del autorizador
+      final runParseado = OptionsModal._parseRut(run);
+      final runAutorizador = runParseado['numero'] ?? '';
+      final dvRunAutorizador = runParseado['dv'] ?? '';
+
+      if (runAutorizador.isEmpty || dvRunAutorizador.isEmpty) {
+        print('❌ RUN inválido');
+        return;
+      }
+
+      // Preparar request
+      final requestBody = {
+        "token_representante": tokenComprador,
+        "run_autorizador": runAutorizador,
+        "dv_autorizador": dvRunAutorizador,
+        "rut_empresa": rutEmpresa,
+        "dv_empresa": dvEmpresa,
+        "token_dispositivo": deviceToken,
+      };
+
+      print('📡 Enviando request a la API...');
+      final response = await http.post(
+        Uri.parse('${GlobalVariables.baseUrl}/CrearAutorizador/api/v2/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'api-key': GlobalVariables.apiKey,
+        },
+        body: json.encode(requestBody),
+      ).timeout(const Duration(seconds: 15));
+
+      print('📡 Response recibido: Status ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+
+        // VERIFICAR SI LA SESIÓN HA EXPIRADO
+        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
+          print('🔐 Sesión expirada');
+          return;
+        }
+
+        if (responseData['success'] == true) {
+          final mensaje = responseData['message'] ?? 'Autorizador asignado exitosamente';
+          print('✅ ÉXITO: $mensaje');
+
+          // EJECUTAR EL CALLBACK DEL AUTORIZADOR
+          onAsignarAutorizador(run);
+
+          // LLAMAR AL CALLBACK PARA ACTUALIZAR LA LISTA
+          if (onActualizarAutorizadores != null) {
+            print('🔄 Ejecutando onActualizarAutorizadores...');
+            onActualizarAutorizadores();
+          }
+        } else {
+          final mensajeError = responseData['message'] ?? responseData['error'] ?? 'Error al asignar autorizador';
+          print('❌ ERROR API: $mensajeError');
+        }
+      } else if (response.statusCode == 401) {
+        print('🔐 Sesión expirada (401 Unauthorized)');
+      } else {
+        print('❌ ERROR HTTP: Status ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ EXCEPCIÓN: Error en _asignarAutorizadorApi: $e');
+    }
   }
 }

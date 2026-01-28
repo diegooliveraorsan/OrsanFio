@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'codigo_verificacion_screen.dart';
 import 'cambiar_contrasena_screen.dart';
+import 'cambiar_pin_seguridad_screen.dart';
+import 'eliminar_cuenta_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -40,9 +41,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      if (widget.onRefresh != null) {
-        widget.onRefresh!();
-      }
+      // ✅ SOLO ACTUALIZAR DATOS LOCALES, NO LLAMAR AL REFRESH DEL PADRE
+      // Si necesitas datos actualizados del servidor, haz una llamada API directa aquí
       await Future.delayed(const Duration(milliseconds: 500));
     } catch (e) {
       print('❌ Error durante refresh: $e');
@@ -332,12 +332,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 12),
 
+          /*
+          // ✅ NUEVA TARJETA: CAMBIAR PIN DE SEGURIDAD
+          _buildSecurityCard(
+            icon: Icons.password_outlined,
+            title: 'Cambiar pin de seguridad',
+            subtitle: 'Actualizar código de 4 dígitos',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CambiarPinSeguridadScreen(
+                    tokenComprador: _getTokenComprador(),
+                    email: _getUserEmail(),
+                    userRun: _getUserRun(),
+                  ),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 12),
+          */
+
           _buildSecurityCard(
             icon: Icons.privacy_tip_outlined,
             title: 'Políticas de privacidad',
             subtitle: 'Consulta nuestras políticas de privacidad',
             onTap: () {
               _abrirPoliticasPrivacidad();
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          // ✅ NUEVA TARJETA: ELIMINAR CUENTA
+          _buildSecurityCard(
+            icon: Icons.delete_forever_outlined,
+            title: 'Eliminar cuenta',
+            subtitle: 'Eliminar permanentemente tu cuenta',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EliminarCuentaScreen(
+                    tokenComprador: _getTokenComprador(),
+                    email: _getUserEmail(),
+                    userRun: _getUserRun(),
+                    userName: _getUserName(),
+                  ),
+                ),
+              );
             },
           ),
 

@@ -127,7 +127,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       print('🎯 ¡Empresa cambiada! Recargando historial de ventas...');
       _lastEmpresaSeleccionada = widget.empresaSeleccionada;
 
-      // Recargar los datos de ventas para la nueva empresa
+      // ✅ NO HACER setState AQUÍ, solo cargar datos
       _fetchSalesHistory();
     }
   }
@@ -195,12 +195,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     });
 
     try {
-      // Primero llamar al refresh del padre si existe
-      if (widget.onRefresh != null) {
-        widget.onRefresh!(); // Solo llamar, sin await
-      }
-
-      // Luego actualizar nuestro propio historial
+      // ✅ SOLO ACTUALIZAR LOS DATOS, NO EL ESTADO DEL PADRE
       await _fetchSalesHistory();
 
       await Future.delayed(const Duration(milliseconds: 500));
