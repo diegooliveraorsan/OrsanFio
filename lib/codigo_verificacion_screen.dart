@@ -240,12 +240,12 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
         "token_dispositivo": _deviceToken!, // ✅ NUEVO CAMPO REQUERIDO EN v2
       };
 
-      print('📤 Request CorreoCodigoCambioPassword (v2):');
-      print('🌐 URL: ${GlobalVariables.baseUrl}/CorreoCodigoCambioPassword/api/v2/'); // ✅ CAMBIADO A v2
+      print('📤 Request CorreoCodigoCambioPassword (v1):');
+      print('🌐 URL: ${GlobalVariables.baseUrl}/CorreoCodigoCambioPassword/api/v1/'); // ✅ CAMBIADO A v2
       print('📋 Body: ${json.encode(requestBody)}');
 
       final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/CorreoCodigoCambioPassword/api/v2/'), // ✅ CAMBIADO A v2
+        Uri.parse('${GlobalVariables.baseUrl}/CorreoCodigoCambioPassword/api/v1/'), // ✅ CAMBIADO A v2
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -254,7 +254,7 @@ class _CodigoVerificacionScreenState extends State<CodigoVerificacionScreen> {
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 15));
 
-      print('📥 Response CorreoCodigoCambioPassword (v2):');
+      print('📥 Response CorreoCodigoCambioPassword (v1):');
       print('  - Status: ${response.statusCode}');
       print('  - Body: ${response.body}');
 

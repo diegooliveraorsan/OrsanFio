@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:async';
+import 'dart:math';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,23 +16,114 @@ import 'log_in_log_up/registro.dart';
 import 'animaciones/simple_loading_dialog.dart';
 import 'variables_globales.dart';
 
-import 'dart:math';
-import 'package:device_info_plus/device_info_plus.dart';
-
-// CONFIGURAR navigatorKey GLOBAL A NIVEL DE MAIN
+// ✅ CONFIGURAR navigatorKey GLOBAL A NIVEL DE MAIN
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// COLOR AZUL OSCURO DEFINIDO GLOBALMENTE
+// ✅ COLOR AZUL OSCURO DEFINIDO GLOBALMENTE
 final Color _blueDarkColor = const Color(0xFF0055B8);
+
+// ✅ CLASE HELPER PARA MANEJO DE TOKENS FCM
+class FCMTokenHelper {
+  static Future<String> getToken() async {
+    try {
+      print('🔄 Obteniendo token FCM...');
+
+      // Inicializar Firebase si no está inicializado
+      try {
+        await Firebase.initializeApp();
+      } catch (e) {
+        print('⚠️ Firebase ya inicializado o error: $e');
+      }
+
+      // Obtener plataforma
+      final bool isIOS = Platform.isIOS;
+      final bool isAndroid = Platform.isAndroid;
+
+      print('📱 Plataforma detectada: ${Platform.operatingSystem}');
+
+      // Solicitar permisos en iOS
+      if (isIOS) {
+        await _requestIOSPermissions();
+      }
+
+      // Intentar obtener token FCM real
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        print('✅ Token FCM obtenido exitosamente');
+        return fcmToken;
+      }
+
+      print('⚠️ No se pudo obtener token FCM real');
+
+      // Crear token simulado basado en plataforma
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      if (isIOS) {
+        return 'ios_simulated_$timestamp';
+      } else if (isAndroid) {
+        return 'android_simulated_$timestamp';
+      } else {
+        return 'unknown_simulated_$timestamp';
+      }
+
+    } catch (e) {
+      print('❌ Error obteniendo token FCM: $e');
+
+      // Fallback seguro por plataforma
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      if (Platform.isIOS) {
+        return 'ios_fallback_$timestamp';
+      } else if (Platform.isAndroid) {
+        return 'android_fallback_$timestamp';
+      } else {
+        return 'unknown_fallback_$timestamp';
+      }
+    }
+  }
+
+  static Future<void> _requestIOSPermissions() async {
+    if (!Platform.isIOS) return;
+
+    try {
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+
+      if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+    } catch (e) {
+      print('❌ Error solicitando permisos iOS: $e');
+    }
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
 
-  // CONFIGURAR EL NAVIGATOR KEY EN EL HANDLER ANTES DE INICIALIZAR
+  print('🚀 Iniciando aplicación...');
+
+  try {
+    await Firebase.initializeApp();
+    print('✅ Firebase inicializado');
+
+    // Solicitar permisos en iOS si es necesario
+    if (Platform.isIOS) {
+      await FCMTokenHelper._requestIOSPermissions();
+    }
+
+  } catch (e) {
+    print('❌ Error inicializando Firebase: $e');
+  }
+
+  // ✅ CONFIGURAR EL NAVIGATOR KEY EN EL HANDLER ANTES DE INICIALIZAR
   NotificationHandler.navigatorKey = navigatorKey;
 
-  // INICIALIZAR NOTIFICACIONES DESPUÉS DE FIREBASE
+  // ✅ INICIALIZAR NOTIFICACIONES DESPUÉS DE FIREBASE
   NotificationHandler.initializeNotifications();
 
   runApp(const OrsanfioApp());
@@ -48,14 +140,14 @@ class OrsanfioApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      navigatorKey: navigatorKey, // CLAVE GLOBAL AQUÍ
-      home: const UpdateCheckScreen(), // Cambiado a UpdateCheckScreen
+      navigatorKey: navigatorKey, // ✅ CLAVE GLOBAL AQUÍ
+      home: const UpdateCheckScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
-// NUEVA PANTALLA PARA VERIFICAR ACTUALIZACIÓN
+// ✅ NUEVA PANTALLA PARA VERIFICAR ACTUALIZACIÓN
 class UpdateCheckScreen extends StatefulWidget {
   const UpdateCheckScreen({super.key});
 
@@ -78,7 +170,6 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
     try {
       print('🔍 Verificando actualizaciones de la app...');
 
-      // OBTENER VERSIÓN DESDE variables_globales.dart
       String currentVersion = GlobalVariables.appVersion;
       String platform = Platform.isAndroid ? "android" : "ios";
 
@@ -123,13 +214,11 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
               _isChecking = false;
             });
           } else {
-            // No hay actualización, continuar con el flujo normal
             setState(() {
               _isChecking = false;
               _updateAvailable = false;
             });
 
-            // Navegar al SplashScreen
             WidgetsBinding.instance.addPostFrameCallback((_) {
               Navigator.pushReplacement(
                 context,
@@ -138,17 +227,14 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
             });
           }
         } else {
-          // Error en la API, continuar con flujo normal
           print('⚠️ Error en API de actualización: ${responseData['mensaje']}');
           _continueWithNormalFlow();
         }
       } else {
-        // Error HTTP, continuar con flujo normal
         print('❌ Error HTTP en verificación de actualización: ${response.statusCode}');
         _continueWithNormalFlow();
       }
     } catch (e) {
-      // Error de conexión, continuar con flujo normal
       print('❌ Error verificando actualización: $e');
       _continueWithNormalFlow();
     }
@@ -205,7 +291,6 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
   }
 
   void _skipUpdate() {
-    // El usuario decidió saltar la actualización
     _continueWithNormalFlow();
   }
 
@@ -218,7 +303,7 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
             ? _buildCheckingUI()
             : _updateAvailable
             ? _buildUpdateAvailableUI()
-            : const SizedBox(), // No debería llegar aquí
+            : const SizedBox(),
       ),
     );
   }
@@ -246,29 +331,22 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Icono de actualización
           Icon(
             Icons.system_update,
             size: 80,
-            color: _blueDarkColor, // COLOR AZUL OSCURO
+            color: _blueDarkColor,
           ),
-
           const SizedBox(height: 24),
-
-          // Título
           Text(
             'Actualización disponible',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: _blueDarkColor, // COLOR AZUL OSCURO
+              color: _blueDarkColor,
             ),
             textAlign: TextAlign.center,
           ),
-
           const SizedBox(height: 16),
-
-          // Versión actual (desde GlobalVariables)
           Text(
             'Versión actual: ${GlobalVariables.appVersion}',
             style: TextStyle(
@@ -276,23 +354,17 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
               color: Colors.grey.shade600,
             ),
           ),
-
           const SizedBox(height: 8),
-
-          // NUEVA VERSIÓN EN AZUL OSCURO
           if (_updateData != null && _updateData!['version_nueva'] != null)
             Text(
               'Nueva versión: ${_updateData!['version_nueva']}',
               style: TextStyle(
                 fontSize: 16,
-                color: _blueDarkColor, // COLOR AZUL OSCURO
+                color: _blueDarkColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
-
           const SizedBox(height: 24),
-
-          // Mensaje
           Text(
             'Es necesario actualizar la aplicación para continuar.',
             style: TextStyle(
@@ -302,19 +374,16 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
             ),
             textAlign: TextAlign.center,
           ),
-
           const SizedBox(height: 30),
           const Divider(color: Colors.grey, thickness: 1),
           const SizedBox(height: 20),
-
-          // BOTÓN DE ACTUALIZAR CON EL NUEVO ESTILO
           SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
               onPressed: _launchUpdateURL,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _blueDarkColor, // COLOR AZUL OSCURO
+                backgroundColor: _blueDarkColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -329,10 +398,7 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Botón para saltar (solo en desarrollo/testing)
           if (_updateData != null &&
               (_updateData!['version_nueva'] as String).contains('dev') ||
               (_updateData!['version_nueva'] as String).contains('test'))
@@ -380,7 +446,6 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // VERIFICAR SI HAY SESIÓN INICIADA DESPUÉS DE LA ANIMACIÓN
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -390,18 +455,13 @@ class _SplashScreenState extends State<SplashScreen>
     });
   }
 
-  // NUEVO MÉTODO PARA VERIFICAR SESIÓN EXISTENTE
   Future<void> _checkExistingSession() async {
     try {
       print('🔍 Verificando si hay sesión iniciada...');
 
-      // Obtener token FCM
-      await Firebase.initializeApp();
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
-      final String deviceToken = fcmToken ??
-          'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
+      final String deviceToken = await _obtenerTokenParaSplash();
 
-      print('📱 Token del dispositivo: $deviceToken');
+      print('📱 Token del dispositivo: ${deviceToken.substring(0, min(30, deviceToken.length))}...');
       print('🌐 Llamando a API SesionIniciada...');
 
       final response = await http.post(
@@ -426,7 +486,6 @@ class _SplashScreenState extends State<SplashScreen>
         print('🎯 Sesión iniciada: $sesionIniciada');
 
         if (sesionIniciada) {
-          // SESIÓN ACTIVA - IR DIRECTAMENTE AL DASHBOARD
           print('🚀 Sesión activa detectada, navegando al dashboard...');
           Navigator.pushReplacement(
             context,
@@ -435,7 +494,6 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           );
         } else {
-          // ❌ NO HAY SESIÓN - MOSTRAR ONBOARDING
           print('🔐 No hay sesión activa, mostrando onboarding...');
           Navigator.pushReplacement(
             context,
@@ -443,7 +501,6 @@ class _SplashScreenState extends State<SplashScreen>
           );
         }
       } else {
-        // ⚠️ ERROR EN LA API - MOSTRAR ONBOARDING
         print('⚠️ Error en API SesionIniciada, mostrando onboarding...');
         Navigator.pushReplacement(
           context,
@@ -451,12 +508,51 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     } catch (e) {
-      // ⚠️ ERROR DE CONEXIÓN - MOSTRAR ONBOARDING
       print('❌ Error verificando sesión: $e');
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),
       );
+    }
+  }
+
+  Future<String> _obtenerTokenParaSplash() async {
+    try {
+      print('🔄 Obteniendo token para SplashScreen...');
+
+      try {
+        await Firebase.initializeApp();
+      } catch (e) {
+        print('⚠️ Firebase ya inicializado en splash: $e');
+      }
+
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        print('✅ Token FCM obtenido en splash');
+        return fcmToken;
+      }
+
+      print('⚠️ No se obtuvo token FCM en splash');
+
+      if (Platform.isIOS) {
+        return 'ios_splash_${DateTime.now().millisecondsSinceEpoch}';
+      } else if (Platform.isAndroid) {
+        return 'android_splash_${DateTime.now().millisecondsSinceEpoch}';
+      } else {
+        return 'unknown_splash_${DateTime.now().millisecondsSinceEpoch}';
+      }
+
+    } catch (e) {
+      print('❌ Error obteniendo token en splash: $e');
+
+      if (Platform.isIOS) {
+        return 'ios_splash_error_${DateTime.now().millisecondsSinceEpoch}';
+      } else if (Platform.isAndroid) {
+        return 'android_splash_error_${DateTime.now().millisecondsSinceEpoch}';
+      } else {
+        return 'unknown_splash_error_${DateTime.now().millisecondsSinceEpoch}';
+      }
     }
   }
 
@@ -541,7 +637,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Título "Bienvenido"
             const Padding(
               padding: EdgeInsets.only(top: 40.0),
               child: Text(
@@ -553,8 +648,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-
-            // Espacio para centrar el contenido
             Expanded(
               child: GestureDetector(
                 onHorizontalDragEnd: (details) {
@@ -585,8 +678,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-
-            // Indicadores de página
             Container(
               padding: const EdgeInsets.only(bottom: 20),
               child: Row(
@@ -600,15 +691,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _currentPage == index
-                          ? _blueDarkColor // COLOR AZUL OSCURO
+                          ? _blueDarkColor
                           : Colors.grey.shade300,
                     ),
                   ),
                 ),
               ),
             ),
-
-            // Botón Continuar
             if (_currentPage == onboardingData.length - 1)
               Padding(
                 padding: const EdgeInsets.only(bottom: 40, left: 24, right: 24),
@@ -620,7 +709,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       _navigateToAuthScreen(context);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _blueDarkColor, // COLOR AZUL OSCURO
+                      backgroundColor: _blueDarkColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -637,7 +726,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               )
             else
-              const SizedBox(height: 90), // Espacio reservado cuando no hay botón
+              const SizedBox(height: 90),
           ],
         ),
       ),
@@ -657,7 +746,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: _blueDarkColor, // COLOR AZUL OSCURO
+                color: _blueDarkColor,
               ),
               textAlign: TextAlign.center,
             ),
@@ -724,7 +813,6 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header con logo como imagen (SIN TEXTO)
                 Center(
                   child: Image.asset(
                     'assets/images/logo_fio.png',
@@ -733,10 +821,7 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen>
                     fit: BoxFit.contain,
                   ),
                 ),
-
                 const SizedBox(height: 30),
-
-                // Título principal
                 const Center(
                   child: Text(
                     'Pagos seguros y rápidos',
@@ -747,10 +832,7 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen>
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 40),
-
-                // Selector de pestañas usando ToggleButtons para mejor control
                 Container(
                   height: 50,
                   decoration: BoxDecoration(
@@ -762,7 +844,7 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen>
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.black,
                     indicator: BoxDecoration(
-                      color: _blueDarkColor, // COLOR AZUL OSCURO
+                      color: _blueDarkColor,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     indicatorSize: TabBarIndicatorSize.tab,
@@ -790,19 +872,13 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen>
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // Contenido de las pestañas - CON ALTURA FIJA PARA MEJOR UX
                 Container(
-                  height: MediaQuery.of(context).size.height * 0.6, // AUMENTADO A 60% DE LA PANTALLA
+                  height: MediaQuery.of(context).size.height * 0.6,
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      // Pestaña INGRESAR
                       LoginContent(),
-
-                      // Pestaña CREAR CUENTA
                       RegisterFormContent(),
                     ],
                   ),
@@ -816,7 +892,6 @@ class _AuthSelectionScreenState extends State<AuthSelectionScreen>
   }
 }
 
-// COMPONENTE DE LOGIN CON VALIDACIÓN SOLO DE EMAIL Y BOTÓN DE VISUALIZAR CONTRASEÑA
 class LoginContent extends StatefulWidget {
   const LoginContent({super.key});
 
@@ -849,28 +924,13 @@ class _LoginContentState extends State<LoginContent> {
   }
 
   Future<String> _getFCMToken() async {
-    try {
-      await Firebase.initializeApp();
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
-
-      if (fcmToken != null) {
-        print('✅ Token FCM obtenido: $fcmToken');
-        return fcmToken;
-      } else {
-        print('⚠️ No se pudo obtener token FCM, usando fallback');
-        return 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
-      }
-    } catch (e) {
-      print('❌ Error obteniendo token FCM: $e');
-      return 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
-    }
+    return await FCMTokenHelper.getToken();
   }
 
   @override
   void initState() {
     super.initState();
     _initializeFCMToken();
-
     _emailController.addListener(_validarEmailEnTiempoReal);
   }
 
@@ -888,13 +948,12 @@ class _LoginContentState extends State<LoginContent> {
       setState(() {
         _deviceToken = fcmToken;
       });
-      print('🎯 Token FCM listo: $fcmToken');
+      print('🎯 Token FCM listo: ${_deviceToken.substring(0, 20)}...');
     } catch (e) {
-      final String fallbackToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
+      print('⚠️ Error inicializando token: $e');
       setState(() {
-        _deviceToken = fallbackToken;
+        _deviceToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
       });
-      print('⚠️ Usando token fallback: $fallbackToken');
     }
   }
 
@@ -954,7 +1013,7 @@ class _LoginContentState extends State<LoginContent> {
       final String platform = _getPlatform();
 
       print('🔍 REQUEST COMPLETO:');
-      print('URL: https://apiorsanpay.orsanevaluaciones.cl/IniciarSesion/api/v1/');
+      print('URL: ${GlobalVariables.baseUrl}/IniciarSesion/api/v1/');
       print('Body: ${json.encode({
         "mail": email,
         "password": password,
@@ -1109,7 +1168,6 @@ class _LoginContentState extends State<LoginContent> {
               ],
             ),
           ),
-
           if (_emailError)
             Padding(
               padding: const EdgeInsets.only(top: 4.0, left: 8.0),
@@ -1121,9 +1179,7 @@ class _LoginContentState extends State<LoginContent> {
                 ),
               ),
             ),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -1159,9 +1215,7 @@ class _LoginContentState extends State<LoginContent> {
               ],
             ),
           ),
-
           const SizedBox(height: 15),
-
           GestureDetector(
             onTap: _navigateToRecuperarContrasena,
             child: Container(
@@ -1177,9 +1231,7 @@ class _LoginContentState extends State<LoginContent> {
               ),
             ),
           ),
-
           const SizedBox(height: 30),
-
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -1210,7 +1262,6 @@ class _LoginContentState extends State<LoginContent> {
               ),
             ),
           ),
-
           SizedBox(height: MediaQuery.of(context).size.height * 0.05),
         ],
       ),
@@ -1218,7 +1269,6 @@ class _LoginContentState extends State<LoginContent> {
   }
 }
 
-// COMPONENTE DE REGISTRO MEJORADO CON NUEVO DISEÑO DE TARJETA DE CONTRASEÑA
 class RegisterFormContent extends StatefulWidget {
   const RegisterFormContent({super.key});
 
@@ -1257,9 +1307,7 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
   void initState() {
     super.initState();
     _initializeFCMToken();
-
     _telefonoController.text = "";
-
     _telefonoController.addListener(_validarTelefonoEnTiempoReal);
     _emailController.addListener(_validarEmailEnTiempoReal);
     _passwordController.addListener(_validarPasswordEnTiempoReal);
@@ -1272,7 +1320,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
     _emailController.removeListener(_validarEmailEnTiempoReal);
     _passwordController.removeListener(_validarPasswordEnTiempoReal);
     _confirmPasswordController.removeListener(_validarConfirmPasswordEnTiempoReal);
-
     _aliasController.dispose();
     _telefonoController.dispose();
     _emailController.dispose();
@@ -1291,13 +1338,7 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
   }
 
   Future<String> _getFCMToken() async {
-    try {
-      await Firebase.initializeApp();
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
-      return fcmToken ?? 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
-    } catch (e) {
-      return 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
-    }
+    return await FCMTokenHelper.getToken();
   }
 
   Future<void> _initializeFCMToken() async {
@@ -1307,9 +1348,8 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
         _deviceToken = fcmToken;
       });
     } catch (e) {
-      final String fallbackToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
       setState(() {
-        _deviceToken = fallbackToken;
+        _deviceToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
       });
     }
   }
@@ -1433,7 +1473,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
     _validarTelefonoEnTiempoReal();
   }
 
-  // NUEVO DISEÑO: TARJETA DE REQUISITOS DE CONTRASEÑA SEGURA
   Widget _buildPasswordRequirementsCard() {
     return Container(
       width: double.infinity,
@@ -1479,7 +1518,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
     );
   }
 
-  // NUEVO DISEÑO: ÍTEM DE REQUISITO
   Widget _buildRequirementItem(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1501,7 +1539,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
     );
   }
 
-  // WIDGET PARA MOSTRAR INDICADORES DE FORTALEZA DE CONTRASEÑA
   Widget _buildPasswordStrengthIndicator() {
     if (_passwordController.text.isEmpty) return const SizedBox.shrink();
 
@@ -1660,7 +1697,7 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
       final String fcmToken = await _getFCMToken();
 
       print('🔍 REQUEST CREAR USUARIO:');
-      print('URL: https://apiorsanpay.orsanevaluaciones.cl/CrearUsuario/api/v1/');
+      print('URL: ${GlobalVariables.baseUrl}/CrearUsuario/api/v1/');
       print('Body: ${json.encode({
         "alias_comprador": _aliasController.text,
         "telefono_comprador": _telefonoController.text,
@@ -1749,9 +1786,7 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
               ],
             ),
           ),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -1783,7 +1818,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
               ],
             ),
           ),
-
           if (_telefonoError)
             Padding(
               padding: const EdgeInsets.only(top: 4.0, left: 8.0),
@@ -1795,9 +1829,7 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
                 ),
               ),
             ),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -1826,7 +1858,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
               ],
             ),
           ),
-
           if (_emailError)
             Padding(
               padding: const EdgeInsets.only(top: 4.0, left: 8.0),
@@ -1838,9 +1869,7 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
                 ),
               ),
             ),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -1879,9 +1908,7 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
               ],
             ),
           ),
-
           _buildPasswordStrengthIndicator(),
-
           if (_passwordError && _passwordErrorMessage.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4.0, left: 8.0),
@@ -1893,9 +1920,7 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
                 ),
               ),
             ),
-
           const SizedBox(height: 15),
-
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -1934,7 +1959,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
               ],
             ),
           ),
-
           if (_confirmPasswordError)
             Padding(
               padding: const EdgeInsets.only(top: 4.0, left: 8.0),
@@ -1946,18 +1970,11 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
                 ),
               ),
             ),
-
           const SizedBox(height: 25),
-
           const Divider(),
-
           const SizedBox(height: 25),
-
-          // NUEVO: TARJETA DE REQUISITOS DE CONTRASEÑA SEGURA
           _buildPasswordRequirementsCard(),
-
           const SizedBox(height: 25),
-
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -1989,7 +2006,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
               ),
             ),
           ),
-
           SizedBox(height: MediaQuery.of(context).size.height * 0.05),
         ],
       ),
@@ -1997,7 +2013,6 @@ class _RegisterFormContentState extends State<RegisterFormContent> {
   }
 }
 
-// PANTALLA DE RECUPERAR CONTRASEÑA CON NUEVO DISEÑO DE TARJETA DE CONTRASEÑA
 class RecuperarContrasenaScreen extends StatefulWidget {
   const RecuperarContrasenaScreen({super.key});
 
@@ -2035,7 +2050,6 @@ class _RecuperarContrasenaScreenState
   @override
   void initState() {
     super.initState();
-
     _emailController.addListener(_actualizarEstadoBoton);
     _codigoController.addListener(_actualizarEstadoBoton);
     _nuevaPasswordController.addListener(_validarPasswordEnTiempoReal);
@@ -2137,53 +2151,51 @@ class _RecuperarContrasenaScreenState
     }
   }
 
-  // NUEVO: TARJETA DE REQUISITOS DE CONTRASEÑA SEGURA (MISMO DISEÑO QUE REGISTRO)
   Widget _buildPasswordRequirementsCard() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.security, size: 16, color: _blueDarkColor),
-              const SizedBox(width: 8),
-              Text(
-                'Requisitos de seguridad',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _blueDarkColor,
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.security, size: 16, color: _blueDarkColor),
+                const SizedBox(width: 8),
+                Text(
+                  'Requisitos de seguridad',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _blueDarkColor,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _buildRequirementItem('Mínimo 8 caracteres'),
-          _buildRequirementItem('Al menos una letra mayúscula'),
-          _buildRequirementItem('Al menos un número (0-9)'),
-          _buildRequirementItem('Al menos un símbolo (! @ # \$ % ^ & *)'),
-          const SizedBox(height: 8),
-          Text(
-            'Ejemplo seguro: "Passw0rd\$2026"',
-            style: TextStyle(
-              fontSize: 13,
-              fontStyle: FontStyle.italic,
-              color: Colors.grey.shade700,
+              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 8),
+            _buildRequirementItem('Mínimo 8 caracteres'),
+            _buildRequirementItem('Al menos una letra mayúscula'),
+            _buildRequirementItem('Al menos un número (0-9)'),
+            _buildRequirementItem('Al menos un símbolo (! @ # \$ % ^ & *)'),
+            const SizedBox(height: 8),
+            Text(
+              'Ejemplo seguro: "Passw0rd\$2026"',
+              style: TextStyle(
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-  // NUEVO: ÍTEM DE REQUISITO (MISMO DISEÑO QUE REGISTRO)
   Widget _buildRequirementItem(String text) {
     return Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -2205,7 +2217,6 @@ class _RecuperarContrasenaScreenState
     );
   }
 
-  // WIDGET PARA MOSTRAR INDICADORES DE FORTALEZA DE CONTRASEÑA
   Widget _buildPasswordStrengthIndicator() {
     if (_nuevaPasswordController.text.isEmpty) return const SizedBox.shrink();
 
@@ -2255,29 +2266,6 @@ class _RecuperarContrasenaScreenState
         ),
       ),
     );
-  }
-
-  void _iniciarTimer() {
-    _timer?.cancel();
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted && _horaEnvioCodigo != null) {
-        final segundosRestantes = _getSegundosRestantes();
-
-        if (segundosRestantes <= 0) {
-          timer.cancel();
-          if (mounted) {
-            setState(() {
-              _codigoEnviado = false;
-              _intentosFallidos = 0;
-              _intentosRestantes = 3;
-            });
-          }
-        } else {
-          setState(() {});
-        }
-      }
-    });
   }
 
   Future<void> _enviarCodigo() async {
@@ -2580,6 +2568,29 @@ class _RecuperarContrasenaScreenState
     return emailRegex.hasMatch(email.trim());
   }
 
+  void _iniciarTimer() {
+    _timer?.cancel();
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted && _horaEnvioCodigo != null) {
+        final segundosRestantes = _getSegundosRestantes();
+
+        if (segundosRestantes <= 0) {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _codigoEnviado = false;
+              _intentosFallidos = 0;
+              _intentosRestantes = 3;
+            });
+          }
+        } else {
+          setState(() {});
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final segundosRestantes = _getSegundosRestantes();
@@ -2636,9 +2647,7 @@ class _RecuperarContrasenaScreenState
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             if (_codigoEnviado && !codigoExpirado) ...[
               Container(
                 width: double.infinity,
@@ -2712,7 +2721,6 @@ class _RecuperarContrasenaScreenState
                 ),
               ),
             ],
-
             if (codigoExpirado && _horaEnvioCodigo != null) ...[
               Container(
                 width: double.infinity,
@@ -2745,7 +2753,6 @@ class _RecuperarContrasenaScreenState
                 ),
               ),
             ],
-
             if (_intentosFallidos > 0 && _codigoEnviado) ...[
               Container(
                 width: double.infinity,
@@ -2778,16 +2785,13 @@ class _RecuperarContrasenaScreenState
                 ),
               ),
             ],
-
             const SizedBox(height: 20),
-
-            // CAMBIO 1: Título "Correo electrónico" en azul oscuro
             Text(
               'Correo electrónico',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: _blueDarkColor, // CAMBIADO A AZUL OSCURO
+                color: _blueDarkColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -2834,27 +2838,22 @@ class _RecuperarContrasenaScreenState
                 setState(() {});
               },
             ),
-
             const SizedBox(height: 24),
-
-            // CAMBIO 1: Título "Código de verificación" en azul oscuro
             Text(
               'Código de verificación',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: _blueDarkColor, // CAMBIADO A AZUL OSCURO
+                color: _blueDarkColor,
               ),
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _codigoController,
               maxLength: 8,
-              // CAMBIO 2: Input modificado para aceptar números y letras
-              keyboardType: TextInputType.text, // CAMBIADO DE number A text
-              inputFormatters: [], // Removido el filtro de solo números
+              keyboardType: TextInputType.text,
               decoration: InputDecoration(
-                hintText: 'Ingresa el código', // ACTUALIZADO TEXTO
+                hintText: 'Ingresa el código',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(color: Colors.grey.shade400),
@@ -2875,16 +2874,13 @@ class _RecuperarContrasenaScreenState
               ),
               textInputAction: TextInputAction.next,
             ),
-
             const SizedBox(height: 24),
-
-            // CAMBIO 1: Título "Nueva contraseña" en azul oscuro
             Text(
               'Nueva contraseña',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: _blueDarkColor, // CAMBIADO A AZUL OSCURO
+                color: _blueDarkColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -2923,9 +2919,7 @@ class _RecuperarContrasenaScreenState
                 textInputAction: TextInputAction.next,
               ),
             ),
-
             _buildPasswordStrengthIndicator(),
-
             if (_passwordError && _passwordErrorMessage.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4.0, left: 8.0),
@@ -2937,16 +2931,13 @@ class _RecuperarContrasenaScreenState
                   ),
                 ),
               ),
-
             const SizedBox(height: 16),
-
-            // CAMBIO 1: Título "Confirmar contraseña" en azul oscuro
             Text(
               'Confirmar contraseña',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: _blueDarkColor, // CAMBIADO A AZUL OSCURO
+                color: _blueDarkColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -2985,7 +2976,6 @@ class _RecuperarContrasenaScreenState
                 textInputAction: TextInputAction.done,
               ),
             ),
-
             if (_confirmPasswordError)
               Padding(
                 padding: const EdgeInsets.only(top: 4.0, left: 8.0),
@@ -2997,15 +2987,9 @@ class _RecuperarContrasenaScreenState
                   ),
                 ),
               ),
-
             const SizedBox(height: 24),
-
-            // NUEVO: TARJETA DE REQUISITOS DE CONTRASEÑA SEGURA
-            // CAMBIO 1: El título dentro de la tarjeta también está en azul oscuro
             _buildPasswordRequirementsCard(),
-
             const SizedBox(height: 32),
-
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -3040,7 +3024,6 @@ class _RecuperarContrasenaScreenState
                 ),
               ),
             ),
-
             const SizedBox(height: 40),
           ],
         ),
@@ -3048,3 +3031,6 @@ class _RecuperarContrasenaScreenState
     );
   }
 }
+
+// ✅ FUNCIÓN HELPER PARA min
+int min(int a, int b) => a < b ? a : b;

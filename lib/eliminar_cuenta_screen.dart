@@ -86,8 +86,8 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
       };
     } else {
       return {
-        'run': '00000000',
-        'dv': '0',
+        'run': '',
+        'dv': '',
       };
     }
   }

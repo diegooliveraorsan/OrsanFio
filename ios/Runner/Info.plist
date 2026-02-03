@@ -2,71 +2,91 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>CFBundleDisplayName</key>
-	<string>Orsanfio</string>
-	<key>CFBundleExecutable</key>
-	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>orsanfio</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>$(FLUTTER_BUILD_NAME)</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
-	<key>CFBundleVersion</key>
-	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>FirebaseScreenReportingEnabled</key>
-	<true/>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>Se necesita acceso a la cámara para la verificación facial y captura de selfies para validación de identidad.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Se necesita acceso al micrófono para la grabación de video durante la verificación de vivacidad.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Se necesita permiso para guardar imágenes en la galería si el usuario lo solicita.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Se necesita acceso a la galería para seleccionar imágenes de documentos de identidad.</string>
-	<key>NSProvisionalUserNotificationUsageDescription</key>
-	<string>Recibir notificaciones provisionales sobre transacciones.</string>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-		<string>audio</string>
-	</array>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen.storyboard</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
-	<key>UIRequiresFullScreen</key>
-	<true/>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<false/>
-	<key>UNNotificationCriticalAlertUsageDescription</key>
-	<string>Recibir notificaciones críticas sobre transacciones urgentes.</string>
-	<key>UserNotificationUsageDescription</key>
-	<string>Recibir notificaciones sobre transacciones y actualizaciones importantes.</string>
+    <!-- Optimización UI -->
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
+
+    <!-- Información básica de la app -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>Orsanfio</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>orsanfio</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(FLUTTER_BUILD_NAME)</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleVersion</key>
+    <string>$(FLUTTER_BUILD_NUMBER)</string>
+
+    <!-- CONFIGURACIÓN FIREBASE (IMPORTANTE) -->
+    <key>FirebaseAppDelegateProxyEnabled</key>
+    <false/>  <!-- CRÍTICO para Flutter + Firebase -->
+    <key>FirebaseMessagingAutoInitEnabled</key>
+    <true/>   <!-- Inicialización automática de FCM -->
+    <key>FirebaseScreenReportingEnabled</key>
+    <false/>  <!-- Desactiva para evitar problemas -->
+
+    <!-- Requerimientos iOS -->
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+
+    <!-- Permisos de hardware -->
+    <key>NSCameraUsageDescription</key>
+    <string>Se necesita acceso a la cámara para la verificación facial y captura de selfies para validación de identidad.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Se necesita acceso al micrófono para la grabación de video durante la verificación de vivacidad.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Se necesita permiso para guardar imágenes en la galería si el usuario lo solicita.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Se necesita acceso a la galería para seleccionar imágenes de documentos de identidad.</string>
+
+    <!-- PERMISOS DE NOTIFICACIONES (REVISADO) -->
+    <key>NSUserNotificationProvisionalUsageDescription</key>  <!-- NOMBRE CORREGIDO -->
+    <string>Recibir notificaciones provisionales sobre transacciones.</string>
+    <key>NSRemoteNotificationUsageDescription</key>  <!-- CLAVE NUEVA NECESARIA -->
+    <string>Esta aplicación requiere notificaciones para alertar sobre transacciones importantes.</string>
+    <key>UNNotificationCriticalAlertUsageDescription</key>
+    <string>Recibir notificaciones críticas sobre transacciones urgentes.</string>
+
+    <!-- Eventos -->
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+
+    <!-- Background Modes -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>remote-notification</string>  <!-- Para FCM en background -->
+    </array>
+
+    <!-- UI/UX -->
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen.storyboard</string>
+    <key>UIMainStoryboardFile</key>
+    <string>Main</string>
+    <key>UIRequiresFullScreen</key>
+    <true/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
 </dict>
 </plist>

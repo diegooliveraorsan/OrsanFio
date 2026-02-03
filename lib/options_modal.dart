@@ -697,7 +697,7 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade800,
+            color: _blueDarkColor,
           ),
         ),
         const SizedBox(height: 8),
@@ -780,7 +780,7 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade800,
+            color: _blueDarkColor,
           ),
         ),
         const SizedBox(height: 12),
