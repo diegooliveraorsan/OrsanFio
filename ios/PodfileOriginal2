@@ -1,10 +1,8 @@
 platform :ios, '13.0'
 
-# Usar frameworks estáticos (recomendado para Firebase)
 use_frameworks! :linkage => :static
 use_modular_headers!
 
-# Deshabilitar estadísticas para mayor privacidad
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -31,77 +29,59 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # ✅ FIREBASE CORE (SIEMPRE PRIMERO)
-  pod 'Firebase/Core', '10.24.0'
-
-  # ✅ FIREBASE MESSAGING (PARA NOTIFICACIONES)
+  # ✅ AÑADE ESTAS LÍNEAS PARA FIREBASE (ARRIBA DE flutter_install_all_ios_pods)
+  pod 'Firebase/Core', '10.24.0'  # Versión específica para compatibilidad
   pod 'Firebase/Messaging', '10.24.0'
+  pod 'Firebase/Analytics', '10.24.0'
 
-  # ❌ REMOVER Analytics si no lo usas (opcional)
-  # pod 'Firebase/Analytics', '10.24.0'
-
-  # 🔧 CONFIGURACIÓN ESPECÍFICA PARA COMPATIBILIDAD
+  # 🔧 IMPORTANTE: Añade esto para evitar conflictos con FlutterFire
   $FirebaseSDKVersion = '10.24.0'
 
-  # ✅ FLUTTER PODS (DESPUÉS DE FIREBASE)
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
 post_install do |installer|
-  # 1. Configuración para todos los targets
+  # Pods targets
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
-
     target.build_configurations.each do |config|
-      # 🔧 CONFIGURACIONES ESENCIALES
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-      config.build_settings['ENABLE_BITCODE'] = 'NO'
-
-      # ✅ PARA SWIFT Y MODULARIDAD
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
-
-      # ✅ VERSIÓN DE SWIFT
-      config.build_settings['SWIFT_VERSION'] = '5.0'
-
-      # 🔧 DEFINICIONES PARA FIREBASE (remover si no usas Analytics)
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      # ✅ AÑADE ESTAS CONFIGURACIONES PARA FIREBASE
+      config.build_settings['ENABLE_BITCODE'] = 'NO'
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
-        # Deshabilitar Analytics si no los necesitas
         'FIRAnalyticsCollectionEnabled=NO',
-        'FIREBASE_ANALYTICS_COLLECTION_ENABLED=NO'
+        'FIREBASE_ANALYTICS_COLLECTION_ENABLED=NO',
+        'FIREBASE_ANALYTICS_COLLECTION_DEACTIVATED=YES'
       ]
+      # Para evitar advertencias de Swift
+      config.build_settings['SWIFT_VERSION'] = '5.0'
     end
   end
 
-  # 2. CONFIGURACIÓN ESPECÍFICA PARA FIREBASE MESSAGING
+  # User project (Runner) targets + aggregate targets
+  installer.aggregate_targets.each do |aggregate_target|
+    aggregate_target.user_project.targets.each do |t|
+      t.build_configurations.each do |config|
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+      end
+    end
+  end
+
+  # ✅ CORREGIR PARA FIREBASE MESSAGING (IMPORTANTE)
   installer.pods_project.targets.each do |target|
     if target.name == 'FirebaseMessaging'
       target.build_configurations.each do |config|
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
           '$(inherited)',
-          # Configuraciones específicas para Protobuf
           'PB_FIELD_32BIT=1',
           'PB_NO_PACKED_STRUCTS=1',
           'PB_ENABLE_MALLOC=1'
         ]
       end
     end
-  end
-
-  # 3. CONFIGURACIÓN PARA TARGETS DE USUARIO (Runner)
-  installer.aggregate_targets.each do |aggregate_target|
-    aggregate_target.user_project.targets.each do |t|
-      t.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      end
-    end
-  end
-
-  # 4. CORREGIR ARCHIVOS DE CABECERA (IMPORTANTE PARA FIREBASE)
-  installer.pods_project.build_configurations.each do |config|
-    config.build_settings['HEADER_SEARCH_PATHS'] ||= '$(inherited)'
   end
 end

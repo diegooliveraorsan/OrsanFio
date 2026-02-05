@@ -33,6 +33,8 @@
     <false/>  <!-- CRÍTICO para Flutter + Firebase -->
     <key>FirebaseMessagingAutoInitEnabled</key>
     <true/>   <!-- Inicialización automática de FCM -->
+    <key>FirebaseScreenReportingEnabled</key>
+    <false/>  <!-- Desactiva para evitar problemas -->
 
     <!-- Requerimientos iOS -->
     <key>LSRequiresIPhoneOS</key>
@@ -48,22 +50,22 @@
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Se necesita acceso a la galería para seleccionar imágenes de documentos de identidad.</string>
 
-    <!-- ✅ PERMISOS DE NOTIFICACIONES CORREGIDOS -->
-    <key>NSUserNotificationsUsageDescription</key>
-    <string>Recibir notificaciones sobre transacciones importantes.</string>
-
-    <!-- Solo si realmente necesitas notificaciones CRÍTICAS (con sonido incluso en silencio) -->
-    <!-- <key>UNNotificationCriticalAlertUsageDescription</key> -->
-    <!-- <string>Recibir notificaciones críticas sobre transacciones urgentes.</string> -->
+    <!-- PERMISOS DE NOTIFICACIONES (REVISADO) -->
+    <key>NSUserNotificationProvisionalUsageDescription</key>  <!-- NOMBRE CORREGIDO -->
+    <string>Recibir notificaciones provisionales sobre transacciones.</string>
+    <key>NSRemoteNotificationUsageDescription</key>  <!-- CLAVE NUEVA NECESARIA -->
+    <string>Esta aplicación requiere notificaciones para alertar sobre transacciones importantes.</string>
+    <key>UNNotificationCriticalAlertUsageDescription</key>
+    <string>Recibir notificaciones críticas sobre transacciones urgentes.</string>
 
     <!-- Eventos -->
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
 
-    <!-- Background Modes PARA NOTIFICACIONES FCM -->
+    <!-- Background Modes -->
     <key>UIBackgroundModes</key>
     <array>
-        <string>remote-notification</string>
+        <string>remote-notification</string>  <!-- Para FCM en background -->
     </array>
 
     <!-- UI/UX -->

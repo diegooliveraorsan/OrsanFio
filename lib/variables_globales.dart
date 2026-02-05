@@ -3,7 +3,7 @@ class GlobalVariables {
   static const String baseUrl = 'https://apiorsanpay.orsanevaluaciones.cl';
   static const String appVersion = "1.0.1";
 
-  static const bool isDebugMode = true; // Cambiar a false en producción
+  static const bool isDebugMode = false; // Cambiar a false en producción
 
   // ✅ URLs de servicios
   static const String regulaApiUrl = 'https://biometria.orsanevaluaciones.cl/';

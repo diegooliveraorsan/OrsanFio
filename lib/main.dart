@@ -329,23 +329,6 @@ class _UpdateCheckScreenState extends State<UpdateCheckScreen> {
               ),
             ),
           ),
-
-          const SizedBox(height: 16),
-
-          // Botón para saltar (solo en desarrollo/testing)
-          if (_updateData != null &&
-              (_updateData!['version_nueva'] as String).contains('dev') ||
-              (_updateData!['version_nueva'] as String).contains('test'))
-            TextButton(
-              onPressed: _skipUpdate,
-              child: Text(
-                'Continuar sin actualizar',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ),
         ],
       ),
     );
