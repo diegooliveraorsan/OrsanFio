@@ -12,6 +12,7 @@ import 'sales_history_screen.dart';
 import 'codigo_verificacion_screen.dart';
 import 'options_modal.dart';
 import 'animaciones/simple_loading_dialog.dart';
+import 'pin_creation_screen.dart';
 
 // ✅ COLORES GLOBALES (MISMO QUE PERFIL)
 final Color _blueDarkColor = const Color(0xFF0055B8);
@@ -40,7 +41,6 @@ void mostrarSnackBarGlobal(BuildContext context, String mensaje) {
 // ✅ REINICIAR LA APLICACIÓN NAVEGANDO AL MAIN
 void _reiniciarAplicacion(BuildContext context) {
   print('🔄 Reiniciando aplicación desde DashboardScreen...');
-
   Navigator.pushNamedAndRemoveUntil(
     context,
     '/',
@@ -51,12 +51,9 @@ void _reiniciarAplicacion(BuildContext context) {
 class RutUtils {
   static String formatRut(String rut) {
     String cleanRut = rut.replaceAll('.', '').replaceAll('-', '');
-
     if (cleanRut.length < 2) return rut;
-
     String numero = cleanRut.substring(0, cleanRut.length - 1);
     String dv = cleanRut.substring(cleanRut.length - 1);
-
     String formatted = '';
     for (int i = numero.length - 1, j = 0; i >= 0; i--, j++) {
       if (j > 0 && j % 3 == 0) {
@@ -64,78 +61,55 @@ class RutUtils {
       }
       formatted = numero[i] + formatted;
     }
-
     return '$formatted-$dv'.toUpperCase();
   }
 
   static Map<String, String> parseRut(String rut) {
     String cleanRut = rut.replaceAll('.', '').replaceAll('-', '').toUpperCase();
     if (cleanRut.length < 2) return {'numero': '', 'dv': ''};
-
     String numero = cleanRut.substring(0, cleanRut.length - 1);
     String dv = cleanRut.substring(cleanRut.length - 1);
-
     return {'numero': numero, 'dv': dv};
   }
 
   static Map<String, String> parseRunFromUserData(Map<String, dynamic> userData) {
     try {
       print('🔍 Buscando RUN en userData...');
-
-      // ✅ OPCIÓN 1: Buscar en comprador directamente
       final comprador = userData['comprador'];
       if (comprador is Map<String, dynamic>) {
-        // Intentar con dv_run_comprador primero
         final runComprador = comprador['run_comprador']?.toString() ?? '';
         final dvRunComprador = comprador['dv_run_comprador']?.toString() ?? '';
-
         print('   - run_comprador: $runComprador');
         print('   - dv_run_comprador: $dvRunComprador');
-
         if (runComprador.isNotEmpty && dvRunComprador.isNotEmpty) {
           return {'numero': runComprador, 'dv': dvRunComprador};
         }
-
-        // Intentar con dv_comprador como alternativa
         final dvComprador = comprador['dv_run_comprador']?.toString() ?? '';
         print('   - dv_run_comprador: $dvComprador');
-
         if (runComprador.isNotEmpty && dvComprador.isNotEmpty) {
           return {'numero': runComprador, 'dv': dvComprador};
         }
-
-        // Buscar en run_completo
         final runCompleto = comprador['run_completo']?.toString() ?? '';
         print('   - run_completo: $runCompleto');
-
         if (runCompleto.isNotEmpty) {
           return parseRut(runCompleto);
         }
       }
-
-      // ✅ OPCIÓN 2: Buscar en toda la estructura del JSON
       print('🔍 Búsqueda profunda en userData...');
       final jsonStr = json.encode(userData);
-
-      // Buscar patrón de RUN (7-9 dígitos)
       final runMatch = RegExp(r'"run[^"]*"\s*:\s*"(\d{7,9})"').firstMatch(jsonStr);
-      // Buscar patrón de DV (1 dígito o K)
       final dvMatch = RegExp(r'"dv[^"]*"\s*:\s*"([0-9Kk])"').firstMatch(jsonStr);
-
       if (runMatch != null && dvMatch != null) {
         final foundRun = runMatch.group(1) ?? '';
         final foundDv = dvMatch.group(1) ?? '';
-
         if (foundRun.isNotEmpty && foundDv.isNotEmpty) {
           print('✅ RUN encontrado en búsqueda profunda: $foundRun-$foundDv');
           return {'numero': foundRun, 'dv': foundDv.toUpperCase()};
         }
       }
-
       print('❌ No se pudo encontrar RUN del comprador');
       print('🔍 Estructura completa del comprador:');
       print(json.encode(userData['comprador']));
-
       return {'numero': '', 'dv': ''};
     } catch (e) {
       print('❌ Error parseando RUN del comprador: $e');
@@ -145,11 +119,9 @@ class RutUtils {
 
   static String formatCurrency(int amount) {
     if (amount == 0) return '\$0';
-
     String amountStr = amount.toString();
     String formatted = '';
     int count = 0;
-
     for (int i = amountStr.length - 1; i >= 0; i--) {
       if (count > 0 && count % 3 == 0) {
         formatted = '.$formatted';
@@ -157,14 +129,12 @@ class RutUtils {
       formatted = amountStr[i] + formatted;
       count++;
     }
-
     return '\$$formatted';
   }
 }
 
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
-
   const DashboardScreen({super.key, required this.userData});
 
   @override
@@ -188,11 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   double _animatedMontoUtilizado = 0.0;
 
   bool _mostrarMensajeLineaCredito = false;
-
-  // Variable para controlar si se está agregando empresa
   bool _isAgregandoEmpresa = false;
-
-  // Variable para mensajes pendientes
   String? _mensajePendiente;
 
   @override
@@ -200,26 +166,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     super.initState();
     _currentUserData = widget.userData;
     _inicializarEmpresaSeleccionada();
-
     _pageController = PageController(initialPage: _currentIndex);
-
     _animationController = AnimationController(
       duration: const Duration(seconds: 1),
       vsync: this,
     );
-
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeOut,
       ),
     );
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _iniciarAnimacion();
       _verificarSesionActualizada();
     });
-
     print('🎯 DashboardScreen iniciado con datos iniciales:');
     _printUserData();
   }
@@ -239,7 +200,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     print('- Dispositivo actual: ${_currentUserData['dispositivo_actual'] != null}');
     print('- Sesión iniciada: ${_currentUserData['sesion_iniciada']}');
     print('- Empresa seleccionada: $_empresaSeleccionada');
-
     final runParseado = RutUtils.parseRunFromUserData(_currentUserData);
     print('- RUN comprador: ${runParseado['numero']}-${runParseado['dv']}');
   }
@@ -256,22 +216,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final lineaCreditoData = _getLineaCreditoData();
     final int montoDisponible = lineaCreditoData['monto_disponible'] as int;
     final int montoUtilizado = lineaCreditoData['monto_utilizado'] as int;
-
     final montoDisponibleTween = Tween<double>(
       begin: 0.0,
       end: montoDisponible.toDouble(),
     );
-
     final montoUtilizadoTween = Tween<double>(
       begin: 0.0,
       end: montoUtilizado.toDouble(),
     );
-
     _animation.addListener(() {
       if (mounted) {
         setState(() {
           _animatedMontoDisponible = montoDisponibleTween.transform(_animation.value);
           _animatedMontoUtilizado = montoUtilizadoTween.transform(_animation.value);
+        });
+      }
+    });
+  }
+
+  void goToProfilePage() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(2);
+        setState(() {
+          _currentIndex = 2;
         });
       }
     });
@@ -295,20 +263,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Future<void> _verificarSesionActualizada() async {
     if (_isLoading) return;
-
     try {
-      if (mounted) {
-        setState(() {
-          _isLoading = true;
-        });
-      }
-
+      if (mounted) setState(() => _isLoading = true);
       print('🔄 Verificando sesión actualizada...');
-
       await Firebase.initializeApp();
       String? fcmToken = await FirebaseMessaging.instance.getToken();
       final String deviceToken = fcmToken ?? 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
-
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/SesionIniciada/api/v1/'),
         headers: {
@@ -316,29 +276,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           'Accept': 'application/json',
           'api-key': GlobalVariables.apiKey,
         },
-        body: json.encode({
-          "token_dispositivo": deviceToken,
-        }),
+        body: json.encode({"token_dispositivo": deviceToken}),
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-
         if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
           _reiniciarAplicacion(context);
           return;
         }
-
         if (responseData['sesion_iniciada'] == true) {
           print('✅ Datos actualizados del servidor');
-
           if (mounted) {
             setState(() {
               _currentUserData = responseData;
               _actualizarEmpresaSeleccionada(responseData);
               _verificarMostrarMensajeLineaCredito();
             });
-
             _actualizarValoresAnimados();
             if (mounted) {
               _animationController.reset();
@@ -349,29 +302,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       }
     } catch (e) {
       print('❌ Error verificando sesión actualizada: $e');
-      if (mounted) {
-        _mostrarSnackBarSeguro('Error al actualizar datos: $e');
-      }
+      if (mounted) _mostrarSnackBarSeguro('Error al actualizar datos: $e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _actualizarEmpresaSeleccionada(Map<String, dynamic> responseData) {
     final empresas = responseData['empresas'] ?? [];
     if (empresas.isNotEmpty) {
-      // ✅ Mantener la empresa seleccionada actual si aún existe
       if (_empresaSeleccionada != null &&
           empresas.any((empresa) => empresa['token_empresa'] == _empresaSeleccionada)) {
         print('✅ Manteniendo empresa seleccionada: $_empresaSeleccionada');
         return;
       }
-
-      // ✅ Si no existe, seleccionar la primera
       _empresaSeleccionada = empresas[0]['token_empresa'];
       print('✅ Nueva empresa seleccionada: $_empresaSeleccionada');
     } else {
@@ -383,7 +327,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final lineaCreditoData = _getLineaCreditoData();
     final bool tieneLineaCredito = lineaCreditoData['tiene_linea_credito'] as bool;
     final bool relacionValida = _esRelacionValida();
-
     if (mounted) {
       setState(() {
         _mostrarMensajeLineaCredito = !tieneLineaCredito && !relacionValida;
@@ -415,7 +358,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     });
   }
 
-  // ✅ MÉTODO PARA MOSTRAR VISTA DE AUTORIZADORES
   void _mostrarVistaAutorizadores() {
     _resetModalState();
     Navigator.push(
@@ -438,7 +380,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  // ✅ MÉTODO PARA MOSTRAR VISTA DE NUEVA EMPRESA
   void _mostrarVistaNuevaEmpresa() {
     _resetModalState();
     Navigator.push(
@@ -447,9 +388,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         builder: (context) => OptionsModal.crearVistaNuevaEmpresa(
           context: context,
           userData: _currentUserData,
-          onAgregarEmpresa: (rut, tipoRelacion) {
-            print('📤 Empresa agregada desde pantalla: $rut - $tipoRelacion');
-            _agregarEmpresaNuevoEnfoque(rut, tipoRelacion);
+          onAgregarEmpresa: (rut, tipoRelacion, pin) {   // ← AHORA RECIBE 3 PARÁMETROS
+            print('📤 Empresa agregada desde pantalla: $rut - $tipoRelacion - PIN: $pin');
+            _agregarEmpresaNuevoEnfoque(rut, tipoRelacion, pin);
           },
           onVolver: () => Navigator.pop(context),
           onReiniciarApp: () => _reiniciarAplicacion(context),
@@ -459,34 +400,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  // ✅ NUEVO ENFOQUE - MÉTODO SIMPLIFICADO Y ROBUSTO
-  Future<void> _agregarEmpresaNuevoEnfoque(String rut, String tipoRelacion) async {
+  Future<void> _agregarEmpresaNuevoEnfoque(String rut, String tipoRelacion, String pin) async {
     if (_isAgregandoEmpresa) {
       print('⚠️ Ya hay una operación en curso');
       _mostrarMensajeSeguro('Ya hay una operación en proceso');
       return;
     }
 
-    print('🚀 NUEVO ENFOQUE: Iniciando proceso para agregar empresa: $rut');
-
-    // ✅ 1. MARCAR QUE ESTAMOS PROCESANDO
+    print('🚀 NUEVO ENFOQUE: Iniciando proceso para agregar empresa: $rut con PIN: $pin');
     _isAgregandoEmpresa = true;
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
 
     bool operacionExitosa = false;
     String? mensajeResultado;
     bool? fueExitosoDirectamente = false;
 
     try {
-      // ✅ 2. MOSTRAR DIALOGO DE CARGA INMEDIATAMENTE
-      print('🎬 Mostrando diálogo de carga...');
-
       final Completer<void> loadingCompleter = Completer<void>();
       BuildContext? dialogContext;
 
-      // Usar un try-catch para manejar cualquier error al mostrar el diálogo
       try {
         await showDialog(
           context: context,
@@ -503,19 +435,15 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         );
       } catch (e) {
         print('⚠️ Error mostrando diálogo: $e');
-        // Continuar de todos modos
       }
 
-      // ✅ 3. DAR TIEMPO PARA QUE EL DIALOGO SE MUESTRE
       await Future.delayed(const Duration(milliseconds: 300));
 
       try {
-        // ✅ 4. OBTENER TOKEN FCM
         await Firebase.initializeApp();
         String? fcmToken = await FirebaseMessaging.instance.getToken();
         final String deviceToken = fcmToken ?? 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
 
-        // ✅ 5. PREPARAR DATOS PARA LA API
         final runData = RutUtils.parseRunFromUserData(_currentUserData);
         final tokenComprador = _currentUserData['comprador']?['token_comprador']?.toString() ?? '';
         final runComprador = runData['numero'] ?? '';
@@ -527,6 +455,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
         final representanteOautorizador = tipoRelacion.toLowerCase() == 'autorizador' ? '1' : '2';
 
+        // ✅ AGREGAR EL PIN AL REQUEST BODY
         final requestBody = {
           "token_comprador": tokenComprador,
           "run_comprador": runComprador,
@@ -535,13 +464,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           "dv_rut_empresa": dvEmpresa,
           "represetante_o_autorizador": representanteOautorizador,
           "token_dispositivo": deviceToken,
+          "pin_seguridad": pin,
         };
 
         print('📦 Enviando request body...');
-
-        // ✅ 6. EJECUTAR LA API CON TIMEOUT
         final response = await http.post(
-          Uri.parse('${GlobalVariables.baseUrl}/AgregarEmpresaAComprador/api/v2/'),
+          Uri.parse('${GlobalVariables.baseUrl}/AgregarEmpresaAComprador/api/v3/'),
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -557,14 +485,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           print('📦 Response Data:');
           print(responseData);
 
-          // ✅ 7. VERIFICAR SESIÓN
           if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
             print('🔐 Sesión expirada, reiniciando app...');
             _reiniciarAplicacion(context);
             return;
           }
 
-          // ✅ 8. VERIFICAR ÉXITO
           if (responseData['success'] == true) {
             operacionExitosa = true;
             fueExitosoDirectamente = true;
@@ -580,23 +506,17 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
       } catch (e) {
         print('❌ Error en API: $e');
-
         if (e is TimeoutException) {
           mensajeResultado = 'La empresa se está procesando. Se actualizará en unos momentos.';
-          operacionExitosa = true; // Considerar éxito para timeouts de procesamiento
+          operacionExitosa = true;
           print('⏰ Timeout - Mensaje especial mostrado');
         } else {
           mensajeResultado = 'Error de conexión: ${e.toString().split(':').first}';
         }
       }
 
-      // ✅ 9. CERRAR DIALOGO DE CARGA
       print('🔒 Completando completer para cerrar diálogo...');
-      if (!loadingCompleter.isCompleted) {
-        loadingCompleter.complete();
-      }
-
-      // ✅ 10. CERRAR DIÁLOGO SI SIGUE ABIERTO
+      if (!loadingCompleter.isCompleted) loadingCompleter.complete();
       if (dialogContext != null && mounted) {
         try {
           Navigator.of(dialogContext!, rootNavigator: true).pop();
@@ -604,121 +524,78 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           print('⚠️ Error cerrando diálogo: $e');
         }
       }
-
-      // ✅ 11. ESPERAR A QUE EL DIÁLOGO SE CIERRE
       await Future.delayed(const Duration(milliseconds: 500));
 
     } catch (e) {
       print('❌ Error en flujo principal: $e');
       mensajeResultado = 'Error en el proceso: ${e.toString().split(':').first}';
     } finally {
-      // ✅ 12. PROCESAR RESULTADO FINAL
       print('🏁 Procesando resultado final...');
-
-      if (mensajeResultado != null) {
-        _mostrarMensajeSeguro(mensajeResultado!);
-      }
-
+      if (mensajeResultado != null) _mostrarMensajeSeguro(mensajeResultado!);
       if (operacionExitosa) {
         print('✅ Operación exitosa, preparando redirección...');
-
-        // ✅ 13. SI FUE EXITOSO DIRECTAMENTE, PROCESAR INMEDIATAMENTE
         if (fueExitosoDirectamente == true) {
-          // Esperar un momento para que el servidor procese
           await Future.delayed(const Duration(seconds: 2));
-
-          // Actualizar datos
           await _verificarSesionActualizada();
-
-          // Buscar y seleccionar la nueva empresa
           _seleccionarYRedirigirEmpresa(rut);
         } else {
-          // Para timeouts, usar un enfoque más lento
           _actualizarDatosDespuesDeAgregarEmpresa(rut);
         }
       }
-
-      // ✅ 14. LIMPIAR ESTADO
       _isAgregandoEmpresa = false;
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
     }
   }
-
-  // ✅ MÉTODO AUXILIAR PARA SELECCIONAR Y REDIRIGIR
   void _seleccionarYRedirigirEmpresa(String rut) {
     print('🎯 Buscando y seleccionando empresa: $rut');
-
     final rutParseado = RutUtils.parseRut(rut);
     final rutNumero = rutParseado['numero'] ?? '';
     final rutDv = rutParseado['dv'] ?? '';
-
     if (rutNumero.isEmpty || rutDv.isEmpty) {
       print('❌ RUT inválido: $rut');
       return;
     }
-
     final empresas = _currentUserData['empresas'] ?? [];
     bool empresaEncontrada = false;
-
     for (var empresa in empresas) {
       final rutEmpresa = empresa['rut_empresa']?.toString() ?? '';
       final dvEmpresa = empresa['dv_rut_empresa']?.toString() ?? '';
-
       if (rutEmpresa == rutNumero && dvEmpresa == rutDv) {
         final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? 'Nueva Empresa';
         final tokenEmpresa = empresa['token_empresa'];
-
         print('✅ Empresa encontrada: $nombreEmpresa (Token: $tokenEmpresa)');
-
         if (mounted && tokenEmpresa != null) {
           setState(() {
             _empresaSeleccionada = tokenEmpresa;
             empresaEncontrada = true;
           });
-
-          // Actualizar animaciones
           _actualizarValoresAnimados();
           _iniciarAnimacion();
           _verificarMostrarMensajeLineaCredito();
-
-          // Mostrar mensaje
           _mostrarMensajeSeguro('Empresa "$nombreEmpresa" seleccionada');
-
-          // Cerrar pantallas de diálogo/modal si existen
           Navigator.popUntil(context, (route) => route.isFirst);
-
-          // Navegar al Home
           _pageController.animateToPage(
             0,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
           );
-
           print('✅ Redirección completada');
         }
         break;
       }
     }
-
     if (!empresaEncontrada) {
       print('⚠️ Empresa no encontrada inmediatamente, se actualizará en background');
       _mostrarMensajeSeguro('La empresa se agregó correctamente y aparecerá pronto');
     }
   }
 
-  // ✅ MÉTODO SEGURO PARA SNACKBAR
   void _mostrarSnackBarSeguro(String mensaje) {
-    if (mounted) {
-      mostrarSnackBarGlobal(context, mensaje);
-    }
+    if (mounted) mostrarSnackBarGlobal(context, mensaje);
   }
 
-  // ✅ MÉTODO MEJORADO PARA MOSTRAR MENSAJES
   void _mostrarMensajeSeguro(String mensaje) {
     print('📢 Intentando mostrar mensaje: $mensaje');
-
     if (mounted) {
       print('✅ Widget montado, mostrando snackbar...');
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -735,79 +612,56 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
-  // ✅ MÉTODO PARA ACTUALIZAR DATOS DESPUÉS DE AGREGAR EMPRESA
   void _actualizarDatosDespuesDeAgregarEmpresa(String rutAgregado) {
     print('🔄 Iniciando actualización de datos...');
-
-    // Usar un Future para no bloquear
     Future.delayed(const Duration(seconds: 1), () async {
       print('⏰ Ejecutando actualización retardada...');
-
       try {
-        // 1. Actualizar datos del servidor
         print('🌐 Actualizando desde servidor...');
         await _verificarSesionActualizada();
-
-        // 2. Buscar y seleccionar la empresa
         print('🎯 Buscando empresa: $rutAgregado');
         final rutParseado = RutUtils.parseRut(rutAgregado);
         final rutNumero = rutParseado['numero'] ?? '';
         final rutDv = rutParseado['dv'] ?? '';
-
         if (rutNumero.isEmpty || rutDv.isEmpty) {
           print('❌ RUT inválido: $rutAgregado');
           return;
         }
-
         final empresas = _currentUserData['empresas'] ?? [];
         bool empresaEncontrada = false;
-
         for (var empresa in empresas) {
           final rutEmpresa = empresa['rut_empresa']?.toString() ?? '';
           final dvEmpresa = empresa['dv_rut_empresa']?.toString() ?? '';
-
           if (rutEmpresa == rutNumero && dvEmpresa == rutDv) {
             final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? 'Nueva Empresa';
             final tokenEmpresa = empresa['token_empresa'];
-
             print('✅ Empresa encontrada: $nombreEmpresa (Token: $tokenEmpresa)');
-
             if (mounted && tokenEmpresa != null && tokenEmpresa != _empresaSeleccionada) {
               setState(() {
                 _empresaSeleccionada = tokenEmpresa;
                 empresaEncontrada = true;
               });
-
-              // Actualizar animaciones
               _actualizarValoresAnimados();
               _iniciarAnimacion();
               _verificarMostrarMensajeLineaCredito();
-
-              // Mostrar mensaje de confirmación
               _mostrarMensajeSeguro('Empresa "$nombreEmpresa" seleccionada');
-
               print('✅ Empresa seleccionada automáticamente');
             }
             break;
           }
         }
-
         if (!empresaEncontrada && empresas.isNotEmpty) {
-          // Si no encontramos la empresa específica, seleccionar la primera
           final primeraEmpresa = empresas[0];
           final tokenPrimeraEmpresa = primeraEmpresa['token_empresa'];
           final nombrePrimeraEmpresa = primeraEmpresa['nombre_empresa']?.toString() ?? 'Empresa';
-
           if (mounted && tokenPrimeraEmpresa != null && tokenPrimeraEmpresa != _empresaSeleccionada) {
             setState(() {
               _empresaSeleccionada = tokenPrimeraEmpresa;
             });
-
             _mostrarMensajeSeguro('Seleccionada: $nombrePrimeraEmpresa');
             print('⚠️ Empresa específica no encontrada, seleccionando primera disponible');
           }
         }
-
         print('✅ Actualización completada');
       } catch (e) {
         print('❌ Error en actualización: $e');
@@ -818,11 +672,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   void _cambiarEmpresa(String nuevaEmpresaToken) {
     if (!mounted || _empresaSeleccionada == nuevaEmpresaToken) return;
-
-    setState(() {
-      _empresaSeleccionada = nuevaEmpresaToken;
-    });
-
+    setState(() => _empresaSeleccionada = nuevaEmpresaToken);
     _actualizarValoresAnimados();
     _iniciarAnimacion();
     _verificarMostrarMensajeLineaCredito();
@@ -830,12 +680,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Map<String, dynamic>? _getEmpresaSeleccionada() {
     if (_empresaSeleccionada == null) return null;
-
     final empresas = _currentUserData['empresas'] ?? [];
     for (var emp in empresas) {
-      if (emp['token_empresa'] == _empresaSeleccionada) {
-        return emp;
-      }
+      if (emp['token_empresa'] == _empresaSeleccionada) return emp;
     }
     return null;
   }
@@ -843,7 +690,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   bool _esRelacionValida() {
     final empresa = _getEmpresaSeleccionada();
     if (empresa == null || empresa.isEmpty) return false;
-
     final validezRelacion = empresa['validez_relacion']?.toString().toLowerCase() ?? '';
     return !validezRelacion.contains('no válida');
   }
@@ -861,16 +707,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildHomeScreenContent() {
     final int userStatus = _getUserStatus();
     final lineaCreditoData = _getLineaCreditoData();
-
     final bool tieneLineaCredito = lineaCreditoData['tiene_linea_credito'] as bool;
     final bool lineaValida = lineaCreditoData['linea_valida'] as bool;
     final bool relacionValida = _esRelacionValida();
-
     final int montoTotal = lineaCreditoData['monto_total'] as int;
     final int montoUtilizado = lineaCreditoData['monto_utilizado'] as int;
     final int montoDisponible = lineaCreditoData['monto_disponible'] as int;
     final double porcentajeUtilizado = _getPorcentajeUtilizado();
-
     final empresaInfoWidget = _buildEmpresaInfo();
 
     return ListView(
@@ -894,7 +737,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 const SizedBox(height: 4),
                 empresaInfoWidget,
               ],
-              if (userStatus >= 3) ...[
+              if (userStatus >= 4) ...[
                 const SizedBox(height: 4),
                 _buildRelacionInfo(),
               ],
@@ -920,28 +763,34 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             buttonText: 'Verificar',
             onPressed: _verifyIdentity,
             color: _blueDarkColor,
-          ),
+          )
+        else if (userStatus == 3)
+            _buildVerificationSection(
+              icon: Icons.lock_outline,
+              title: 'Crear PIN de seguridad',
+              subtitle: 'Protege tu cuenta creando un PIN de 4 dígitos.',
+              buttonText: 'Crear PIN',
+              onPressed: _navigateToPinCreation,
+              color: _blueDarkColor,
+            ),
 
-        if (userStatus >= 3 && _empresaSeleccionada != null && lineaValida) ...[
+        if (userStatus >= 4 && _empresaSeleccionada != null && lineaValida) ...[
           const SizedBox(height: 16),
-
           _buildTarjetaMontoDisponible(
             montoDisponible: montoDisponible,
             montoTotal: montoTotal,
             montoUtilizado: montoUtilizado,
             porcentajeUtilizado: porcentajeUtilizado,
           ),
-
           if (relacionValida &&
               (lineaCreditoData['fecha_asignacion'] != '' ||
                   lineaCreditoData['fecha_caducidad'] != '')) ...[
             _buildTarjetaFechas(lineaCreditoData),
           ],
-
           const SizedBox(height: 24),
         ],
 
-        if (userStatus >= 3 && _empresaSeleccionada != null) ...[
+        if (userStatus >= 4 && _empresaSeleccionada != null) ...[
           if (tieneLineaCredito && !relacionValida) ...[
             Container(
               padding: const EdgeInsets.all(16),
@@ -966,9 +815,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ],
               ),
             ),
-          ]
-
-          else if (!tieneLineaCredito && relacionValida) ...[
+          ] else if (!tieneLineaCredito && relacionValida) ...[
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -992,64 +839,84 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ],
               ),
             ),
-          ]
-
-          else if (_mostrarMensajeLineaCredito) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.grey.shade600),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'La empresa seleccionada no tiene línea de crédito disponible',
-                            style: TextStyle(
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          print('🔄 Recargando vista desde botón...');
-                          _verificarSesionActualizada();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _blueDarkColor,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Recargar Vista',
+          ] else if (_mostrarMensajeLineaCredito) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.grey.shade600),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'La empresa seleccionada no tiene línea de crédito disponible',
                           style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        print('🔄 Recargando vista desde botón...');
+                        _verificarSesionActualizada();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _blueDarkColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Recargar Vista',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
+          ],
         ],
       ],
+    );
+  }
+
+  void _navigateToPinCreation() {
+    final tokenComprador = _currentUserData['comprador']?['token_comprador']?.toString();
+    final correo = _currentUserData['comprador']?['correo_comprador']?.toString();
+    final tokenDispositivo = _currentUserData['dispositivo_actual']?['token_dispositivo']?.toString() ??
+        (_currentUserData['dispositivos'] as List?)?.firstOrNull?['token_dispositivo']?.toString();
+    if (tokenComprador == null || correo == null || tokenDispositivo == null) {
+      mostrarSnackBarGlobal(context, 'Error: No se pudo obtener la información necesaria');
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PinCreationScreen(
+          tokenComprador: tokenComprador,
+          correoComprador: correo,
+          tokenDispositivo: tokenDispositivo,
+          onPinCreated: _verificarSesionActualizada,
+          crearPin: true,
+        ),
+      ),
     );
   }
 
@@ -1071,13 +938,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           _currentUserData['comprador']['alias_comprador'] != null) {
         return _currentUserData['comprador']['alias_comprador'].toString();
       }
-
       if (_currentUserData['comprador'] != null &&
           _currentUserData['comprador']['correo_comprador'] != null) {
         String email = _currentUserData['comprador']['correo_comprador'].toString();
         return email.split('@').first;
       }
-
       return 'Usuario';
     } catch (e) {
       return 'Usuario';
@@ -1098,21 +963,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   Widget _buildEmpresaInfo() {
     final empresa = _getEmpresaSeleccionada();
-
-    if (empresa == null || empresa.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
+    if (empresa == null || empresa.isEmpty) return const SizedBox.shrink();
     final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? '';
-    if (nombreEmpresa.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
+    if (nombreEmpresa.isEmpty) return const SizedBox.shrink();
     final validezRelacion = empresa['validez_relacion']?.toString().toLowerCase() ?? '';
-    if (validezRelacion.contains('no válida')) {
-      return const SizedBox.shrink();
-    }
-
+    if (validezRelacion.contains('no válida')) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
@@ -1131,15 +986,10 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final String texto = esValida ? 'Relación válida' : 'Relación no válida';
     final Color iconColor = esValida ? const Color(0xFF4CAF50) : const Color(0xFF9E9E9E);
     final IconData icon = esValida ? Icons.check_circle : Icons.cancel;
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: iconColor,
-        ),
+        Icon(icon, size: 16, color: iconColor),
         const SizedBox(width: 4),
         Text(
           texto,
@@ -1156,22 +1006,18 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Map<String, dynamic> _getLineaCreditoData() {
     try {
       final lineasCredito = _currentUserData['lineas_credito'] ?? [];
-
       if (_empresaSeleccionada != null) {
         for (int i = 0; i < lineasCredito.length; i++) {
           final linea = lineasCredito[i];
           final empresaLinea = linea['empresa'];
           final tokenEmpresaLinea = empresaLinea?['token_empresa'];
-
           if (tokenEmpresaLinea == _empresaSeleccionada) {
             final montoTotal = linea['monto_linea_credito'] ?? 0;
             final montoUtilizado = linea['monto_utilizado'] ?? 0;
             final montoDisponible = linea['monto_disponible'] ?? montoTotal;
-
             final tieneLineaCredito = montoTotal > 0;
             final empresa = _getEmpresaSeleccionada();
             final relacionValida = empresa != null ? _esRelacionValida() : false;
-
             return {
               'monto_total': montoTotal,
               'monto_utilizado': montoUtilizado,
@@ -1184,7 +1030,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           }
         }
       }
-
       return {
         'monto_total': 0,
         'monto_utilizado': 0,
@@ -1211,7 +1056,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final data = _getLineaCreditoData();
     final montoTotal = data['monto_total'] as int;
     final montoUtilizado = data['monto_utilizado'] as int;
-
     if (montoTotal == 0) return 0.0;
     return montoUtilizado / montoTotal;
   }
@@ -1219,11 +1063,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Future<void> _logout() async {
     try {
       print('🚪 Cerrando sesión...');
-
       final String tokenComprador = _currentUserData['comprador']?['token_comprador'] ?? '';
       final String tokenDispositivo = _currentUserData['dispositivo_actual']?['token_dispositivo'] ??
           _currentUserData['dispositivos']?[0]?['token_dispositivo'] ?? '';
-
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/CerrarSesion/api/v1/'),
         headers: {
@@ -1236,7 +1078,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           "token_dispositivo": tokenDispositivo,
         }),
       );
-
       if (response.statusCode == 200) {
         print('✅ Sesión cerrada exitosamente');
         Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
@@ -1259,15 +1100,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final double porcentajeUtilizadoAnimado = montoTotal > 0
         ? _animatedMontoUtilizado / montoTotal.toDouble()
         : 0.0;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey.shade300,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.3),
@@ -1301,7 +1138,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
               const SizedBox(height: 20),
-
               Center(
                 child: Column(
                   children: [
@@ -1336,9 +1172,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ],
                 ),
               ),
-
               const SizedBox(height: 24),
-
               LayoutBuilder(
                 builder: (context, constraints) {
                   return Container(
@@ -1369,9 +1203,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   );
                 },
               ),
-
               const SizedBox(height: 16),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1417,14 +1249,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   Widget _buildTarjetaFechas(Map<String, dynamic> lineaCreditoData) {
     final fechaAsignacion = lineaCreditoData['fecha_asignacion'] as String;
     final fechaCaducidad = lineaCreditoData['fecha_caducidad'] as String;
-
     final bool tieneAsignacion = fechaAsignacion.isNotEmpty;
     final bool tieneCaducidad = fechaCaducidad.isNotEmpty;
-
-    if (!tieneAsignacion && !tieneCaducidad) {
-      return const SizedBox.shrink();
-    }
-
+    if (!tieneAsignacion && !tieneCaducidad) return const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       width: double.infinity,
@@ -1439,10 +1266,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 esPrimera: true,
               ),
             ),
-
-          if (tieneAsignacion && tieneCaducidad)
-            const SizedBox(width: 12),
-
+          if (tieneAsignacion && tieneCaducidad) const SizedBox(width: 12),
           if (tieneCaducidad)
             Expanded(
               child: _buildTarjetaFechaIndividual(
@@ -1464,18 +1288,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     required bool esPrimera,
   }) {
     final fechaFormateada = _formatDateDDMMYYYY(fecha);
-
     return Container(
-      margin: EdgeInsets.only(
-        bottom: 16,
-        right: esPrimera ? 0 : 0,
-      ),
+      margin: EdgeInsets.only(bottom: 16, right: esPrimera ? 0 : 0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey.shade300,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.2),
@@ -1509,14 +1326,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   color: _blueDarkColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  icon,
-                  color: _blueDarkColor,
-                  size: 24,
-                ),
+                child: Icon(icon, color: _blueDarkColor, size: 24),
               ),
               const SizedBox(height: 12),
-
               Text(
                 titulo,
                 style: TextStyle(
@@ -1527,7 +1339,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-
               Text(
                 fechaFormateada,
                 style: const TextStyle(
@@ -1568,10 +1379,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey.shade300,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.3),
@@ -1606,11 +1414,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       color: color.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      icon,
-                      color: color,
-                      size: 20,
-                    ),
+                    child: Icon(icon, color: color, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1625,9 +1429,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
                 ],
               ),
-
               const SizedBox(height: 12),
-
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
@@ -1639,9 +1441,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
@@ -1672,16 +1472,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   void _verifyEmail() {
     print('📧 Verificar email: ${_getUserEmail()}');
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EmailVerificationScreen(
           userEmail: _getUserEmail(),
           tokenComprador: _currentUserData['comprador']?['token_comprador'] ?? '',
-          onBack: () {
-            Navigator.pop(context);
-          },
+          onBack: () => Navigator.pop(context),
           userData: _currentUserData,
         ),
       ),
@@ -1690,7 +1487,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   void _verifyIdentity() {
     print('🔐 Verificar identidad - Navegando a registro');
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1703,12 +1499,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   void _cambiarSiguienteEmpresa() {
     final empresas = _currentUserData['empresas'] ?? [];
-
     if (empresas.isEmpty) return;
-
     final int cantidadEmpresas = empresas.length;
     if (cantidadEmpresas == 1) return;
-
     int currentIndex = -1;
     for (int i = 0; i < cantidadEmpresas; i++) {
       if (empresas[i]['token_empresa'] == _empresaSeleccionada) {
@@ -1716,19 +1509,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         break;
       }
     }
-
     int nextIndex = (currentIndex + 1) % (empresas.length as int);
     final siguienteEmpresa = empresas[nextIndex];
     final nuevaEmpresaToken = siguienteEmpresa['token_empresa'];
-
     print('🔄 Cambiando a siguiente empresa: ${siguienteEmpresa['nombre_empresa']}');
-
-    if (mounted) {
-      setState(() {
-        _empresaSeleccionada = nuevaEmpresaToken;
-      });
-    }
-
+    if (mounted) setState(() => _empresaSeleccionada = nuevaEmpresaToken);
     _actualizarValoresAnimados();
     _iniciarAnimacion();
     _verificarMostrarMensajeLineaCredito();
@@ -1737,16 +1522,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final int userStatus = _getUserStatus();
-    final bool mostrarOpciones = userStatus >= 3;
-
-    // Mostrar mensaje pendiente si existe
+    final bool mostrarOpciones = userStatus >= 4;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_mensajePendiente != null && mounted) {
         mostrarSnackBarGlobal(context, _mensajePendiente!);
         _mensajePendiente = null;
       }
     });
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -1763,7 +1545,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         ),
         centerTitle: false,
         actions: [
-          // ✅ INDICADOR DE CARGA SEPARADO CUANDO SE ESTÁ AGREGANDO EMPRESA
           if (_isAgregandoEmpresa)
             Padding(
               padding: const EdgeInsets.only(right: 16),
@@ -1778,7 +1559,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 ),
               ),
             ),
-          // ✅ SIEMPRE MOSTRAR LOS 3 PUNTITOS (NO SE REEMPLAZAN CON EL INDICADOR)
           if (mostrarOpciones)
             IconButton(
               icon: Icon(Icons.more_vert, color: _blueDarkColor),
@@ -1792,33 +1572,25 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
-              color: _blueDarkColor,
-            ),
+            CircularProgressIndicator(color: _blueDarkColor),
             const SizedBox(height: 16),
             Text(
               'Cargando...',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(color: Colors.grey.shade600),
             ),
           ],
         ),
       )
           : NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification notification) {
-          if (_isModalOpen) {
-            return true;
-          }
+          if (_isModalOpen) return true;
           return false;
         },
         child: PageView(
           controller: _pageController,
           onPageChanged: (index) {
             if (!_isModalOpen && mounted) {
-              setState(() {
-                _currentIndex = index;
-              });
+              setState(() => _currentIndex = index);
             }
           },
           physics: _isModalOpen
@@ -1837,7 +1609,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               onLogout: _logout,
               empresaSeleccionada: _empresaSeleccionada,
               onRefresh: _verificarSesionActualizada,
+              onEditComplete: goToProfilePage, // ← NUEVO
             ),
+
           ],
         ),
       ),
@@ -1855,7 +1629,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           currentIndex: _currentIndex,
           onTap: (index) {
             if (_isModalOpen) return;
-
             if (index == 2) {
               final now = DateTime.now();
               if (_lastProfileTap != null &&
@@ -1896,7 +1669,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ],
           selectedItemColor: _blueDarkColor,
-          unselectedItemColor: Color(0xFF9E9E9E),
+          unselectedItemColor: const Color(0xFF9E9E9E),
           selectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 12,
@@ -1915,17 +1688,13 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   String _getNombreEmpresaSeleccionada() {
     if (_empresaSeleccionada == null) return 'No hay empresa seleccionada';
-
     final empresa = _getEmpresaSeleccionada();
     if (empresa == null || empresa.isEmpty) return 'Empresa no encontrada';
-
     final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? '';
     final rut = empresa['rut_empresa']?.toString() ?? '';
     final dv = empresa['dv_rut_empresa']?.toString() ?? '';
-
     if (nombreEmpresa.isNotEmpty) return nombreEmpresa;
     if (rut.isNotEmpty && dv.isNotEmpty) return 'Empresa $rut-$dv';
-
     return 'Empresa desconocida';
   }
 }

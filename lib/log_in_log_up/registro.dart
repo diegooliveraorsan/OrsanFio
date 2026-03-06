@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../document_reader/document_reader_service.dart';
 import '../face_api/face_api_service.dart';
-import '../dashboard_screen2.dart';
+import '../dashboard_screen.dart';
 import '../variables_globales.dart';
 
 // Clase de utilidades para RUT chileno
@@ -80,8 +80,7 @@ class RutUtils {
   }
 }
 
-// ✅ COLOR AZUL OSCURO (MISMO QUE EN OTRAS VISTAS)
-const Color _blueDarkColor = Color(0xFF0055B8);
+// Color de fondo para tarjetas (aprobado)
 const Color _approvedCardBackground = Color(0xFFE8F0FE);
 
 // ✅ PANTALLA DE CONFIRMACIÓN ANTES DEL ESCANEO
@@ -119,17 +118,17 @@ class ScanConfirmationScreen extends StatelessWidget {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: _blueDarkColor.withOpacity(0.1),
+                  color: GlobalVariables.blueDarkColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: _blueDarkColor,
+                    color: GlobalVariables.blueDarkColor,
                     width: 2,
                   ),
                 ),
                 child: Icon(
                   Icons.camera_alt,
                   size: 50,
-                  color: _blueDarkColor,
+                  color: GlobalVariables.blueDarkColor,
                 ),
               ),
               const SizedBox(height: 32),
@@ -140,7 +139,7 @@ class ScanConfirmationScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: _blueDarkColor,
+                  color: GlobalVariables.blueDarkColor,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -232,7 +231,7 @@ class ScanConfirmationScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: onConfirm,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _blueDarkColor,
+                        backgroundColor: GlobalVariables.blueDarkColor,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -261,9 +260,9 @@ class ScanConfirmationScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _blueDarkColor.withOpacity(0.1),
+        color: GlobalVariables.blueDarkColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _blueDarkColor.withOpacity(0.3)),
+        border: Border.all(color: GlobalVariables.blueDarkColor.withOpacity(0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +271,7 @@ class ScanConfirmationScreen extends StatelessWidget {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: _blueDarkColor,
+              color: GlobalVariables.blueDarkColor,
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -455,7 +454,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _blueDarkColor.withOpacity(0.8), width: 2),
+                border: Border.all(color: GlobalVariables.blueDarkColor.withOpacity(0.8), width: 2),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
@@ -468,11 +467,11 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                         'assets/images/logo_orsan.png',
                         width: 40,
                         height: 40,
-                        color: _blueDarkColor.withOpacity(0.8),
+                        color: GlobalVariables.blueDarkColor.withOpacity(0.8),
                         errorBuilder: (context, error, stackTrace) => Icon(
                           Icons.autorenew,
                           size: 40,
-                          color: _blueDarkColor.withOpacity(0.8),
+                          color: GlobalVariables.blueDarkColor.withOpacity(0.8),
                         ),
                       ),
                     );
@@ -556,24 +555,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     FocusScope.of(context).unfocus();
   }
 
-  void _showSnackBar(String message) {
-    if (!mounted) {
-      print('⚠️ No se puede mostrar SnackBar - Widget desmontado: $message');
-      return;
-    }
-
-    try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } catch (e) {
-      print('❌ Error mostrando SnackBar: $e');
-    }
-  }
-
   Future<void> _scanDocument() async {
     if (!mounted) {
       print('❌ CRÍTICO: Widget no montado al iniciar escaneo');
@@ -613,7 +594,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
           message += ' - Continuando con segunda cara...';
         }
         if (hasValidFacialImage) {
-          message += ' - ✅ Foto facial válida para biometría';
+          message += ' - Foto facial válida para biometría';
         } else {
           message += ' - ⚠️ Imagen facial no apta para biometría';
         }
@@ -621,25 +602,19 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
           message += ' - ⚠️ Verificar consistencia de datos';
         }
 
-        _showSnackBar(message);
+        if (mounted) GlobalSnackBars.mostrarInfo(context, message);
 
         if (_rutController.text.isNotEmpty && result['documentData'] != null) {
           final documentRun = result['documentData']['run'] ?? '';
           final enteredRun = _rutController.text.replaceAll('.', '').replaceAll('-', '').toUpperCase();
           final documentRunClean = documentRun.replaceAll('.', '').replaceAll('-', '').toUpperCase();
-
-          if (documentRunClean != enteredRun) {
-            _showSnackBar('⚠️ El RUT del documento no coincide con el ingresado');
-          } else {
-            _showSnackBar('✅ RUT del documento coincide con el ingresado');
-          }
         }
 
         if (result['validDocument'] == true && hasValidFacialImage && hasBothSides) {
           await Future.delayed(const Duration(seconds: 1));
           await _captureFace();
         } else if (result['validDocument'] == true && !hasValidFacialImage && hasBothSides) {
-          _showSnackBar('⚠️ Documento válido pero imagen facial no apta para biometría');
+          if (mounted) GlobalSnackBars.mostrarInfo(context, '⚠️ Documento válido pero imagen facial no apta para biometría');
         }
 
       } else {
@@ -648,7 +623,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
           errorMessage = result['error'].toString();
         }
 
-        _showSnackBar('$errorMessage - Puede intentar nuevamente');
+        if (mounted) GlobalSnackBars.mostrarError(context, '$errorMessage - Puede intentar nuevamente');
         setState(() {
           _documentStatus = 'No escaneado';
           _currentStep = _getCurrentStepMessage();
@@ -657,7 +632,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     } catch (e) {
       print('❌ Error en escaneo: $e');
       if (mounted) {
-        _showSnackBar('Error en escaneo: ${e.toString().split('\n').first} - Intente nuevamente');
+        GlobalSnackBars.mostrarError(context, 'Error en escaneo: ${e.toString().split('\n').first} - Intente nuevamente');
         setState(() {
           _documentStatus = 'No escaneado';
           _currentStep = _getCurrentStepMessage();
@@ -679,13 +654,13 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
     // ✅ CORREGIDO: Ahora verifica solo si contiene '✓'
     if (!_documentStatus.contains('✓')) {
-      _showSnackBar('Primero debe completar la verificación de documento');
+      if (mounted) GlobalSnackBars.mostrarInfo(context, 'Primero debe completar la verificación de documento');
       return;
     }
 
     final hasValidFacialImage = _lastDocumentResult?['documentFaceImage']?['success'] == true;
     if (!hasValidFacialImage) {
-      _showSnackBar('El documento no tiene una imagen facial válida para comparación biométrica');
+      if (mounted) GlobalSnackBars.mostrarInfo(context, 'El documento no tiene una imagen facial válida para comparación biométrica');
       return;
     }
 
@@ -719,13 +694,13 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
         if (isLive && isMatch) {
           faceStatusText = '✓';
-          snackBarMessage = '✅ Biometría exitosa - Similitud: ${similarity.toStringAsFixed(1)}% - Vivacidad: ${livenessScore.toStringAsFixed(1)}%';
+          snackBarMessage = 'Biometría exitosa';
         } else if (isLive && !isMatch) {
           faceStatusText = 'Rostro ✗';
-          snackBarMessage = '❌ Rostro no coincide - Similitud: ${similarity.toStringAsFixed(1)}%';
+          snackBarMessage = 'Rostro no coincide - Similitud: ${similarity.toStringAsFixed(1)}%';
         } else {
           faceStatusText = 'Vivacidad ✗';
-          snackBarMessage = '❌ Falló verificación de vivacidad: $livenessStatus';
+          snackBarMessage = 'Falló verificación de vivacidad: $livenessStatus';
         }
 
         setState(() {
@@ -733,18 +708,18 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
           _currentStep = _getCurrentStepMessage();
         });
 
-        _showSnackBar(snackBarMessage);
+        if (mounted) GlobalSnackBars.mostrarExito(context, snackBarMessage);
 
       } else {
         final error = result?['error'] ?? 'Captura facial falló o fue cancelada';
-        _showSnackBar('❌ $error');
+        if (mounted) GlobalSnackBars.mostrarError(context, '❌ $error');
         setState(() {
           _faceStatus = 'No capturado';
           _currentStep = _getCurrentStepMessage();
         });
       }
     } catch (e) {
-      _showSnackBar('Error en biometría: ${e.toString().split('\n').first} - Intente nuevamente');
+      if (mounted) GlobalSnackBars.mostrarError(context, 'Error en biometría: ${e.toString().split('\n').first} - Intente nuevamente');
       if (mounted) {
         setState(() {
           _faceStatus = 'No capturado';
@@ -821,7 +796,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     }
 
     if (!_canRequestCredit()) {
-      _showSnackBar('Por favor, complete todas las verificaciones primero');
+      if (mounted) GlobalSnackBars.mostrarInfo(context, 'Por favor, complete todas las verificaciones primero');
       return;
     }
 
@@ -840,6 +815,16 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
       final String detalleCarnet = _buildDetalleCarnet();
 
       print('🔐 Enviando solicitud de línea de crédito...');
+
+      print(      "token_comprador: $tokenComprador");
+      print(      "run_comprador: ${runComprador['numero']}");
+      print(      "dv_comprador: ${runComprador['dv']}");
+      print(      "nombres_comprador: ${_lastDocumentResult?['documentData']?['nombres'] ?? ''}");
+      print(      "apellidos_comprador: ${_lastDocumentResult?['documentData']?['apellidos'] ?? ''}");
+      print(      "rut_empresa: ${rutEmpresa['numero']}");
+      print(      "dv_empresa: ${rutEmpresa['dv']}");
+      print(      "represetante_o_autorizador: ${tipoRelacionNumerico}");
+      print(      "detalle_carnet: $detalleCarnet");
 
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/AutenticarComprador/api/v1/'),
@@ -866,11 +851,30 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        _showSnackBar('✅ Solicitud de línea de crédito enviada exitosamente');
-
-        _volverAlHome();
+        if (responseData['success'] == true) {
+          if (mounted) {
+            GlobalSnackBars.mostrarExito(
+              context,
+              responseData['mensaje'] ?? 'Solicitud de línea de crédito enviada exitosamente',
+            );
+          }
+          _volverAlHome();
+        } else {
+          if (mounted) {
+            GlobalSnackBars.mostrarError(
+              context,
+              responseData['mensaje'] ?? 'Error en la solicitud',
+            );
+          }
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _currentStep = _getCurrentStepMessage();
+            });
+          }
+        }
       } else {
-        _showSnackBar('❌ Error en solicitud: ${response.statusCode}');
+        if (mounted) GlobalSnackBars.mostrarError(context, 'Error en solicitud: ${response.statusCode}');
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -881,7 +885,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
     } catch (e) {
       print('❌ Error en solicitud de línea de crédito: $e');
-      _showSnackBar('Error en solicitud: ${e.toString().split('\n').first}');
+      if (mounted) GlobalSnackBars.mostrarError(context, 'Error en solicitud: ${e.toString().split('\n').first}');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -932,15 +936,38 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
   String _buildDetalleCarnet() {
     try {
+      // 📄 DATOS DEL DOCUMENTO (incluyendo la foto)
+      Map<String, dynamic> documentoData = {};
+      if (_lastDocumentResult != null && _lastDocumentResult!['documentData'] != null) {
+        documentoData = Map<String, dynamic>.from(_lastDocumentResult!['documentData']!);
+      }
+
+      // Agregar la foto facial extraída del carnet (si existe)
+      final String? fotoCarnet = _lastDocumentResult?['documentFaceImage']?['faceImage'];
+      if (fotoCarnet != null && fotoCarnet.isNotEmpty) {
+        documentoData['foto'] = fotoCarnet;
+      }
+
+      // 🧬 DATOS DE BIOMETRÍA (sin logs)
+      Map<String, dynamic> biometriaData = {};
+      if (_lastFaceResult != null) {
+        biometriaData = Map<String, dynamic>.from(_lastFaceResult!);
+        // Eliminar campos pesados
+        biometriaData.remove('diagnosticLogs');
+        biometriaData.remove('faceImage'); // por si acaso estuviera
+      }
+
+      // 📦 ESTRUCTURA FINAL
       final Map<String, dynamic> detalle = {
-        'documento': _lastDocumentResult?['documentData'] ?? {},
-        'biometria': _lastFaceResult ?? {},
+        'documento': documentoData,
+        'biometria': biometriaData,
         'fecha_solicitud': DateTime.now().toIso8601String(),
-        'proceso_completo': true
+        'proceso_completo': true,
       };
 
       return json.encode(detalle);
     } catch (e) {
+      print('❌ Error construyendo detalle_carnet: $e');
       return json.encode({'error': 'No se pudo generar detalle del carnet'});
     }
   }
@@ -970,7 +997,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _blueDarkColor,
+            color: GlobalVariables.blueDarkColor,
           ),
         ),
         const SizedBox(height: 12),
@@ -1019,12 +1046,12 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: seleccionado
-              ? _blueDarkColor.withOpacity(0.1)
+              ? GlobalVariables.blueDarkColor.withOpacity(0.1)
               : _approvedCardBackground,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: seleccionado
-                ? _blueDarkColor
+                ? GlobalVariables.blueDarkColor
                 : Colors.grey.shade300,
             width: seleccionado ? 2 : 1,
           ),
@@ -1044,19 +1071,19 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
               height: 40,
               decoration: BoxDecoration(
                 color: seleccionado
-                    ? _blueDarkColor.withOpacity(0.1)
+                    ? GlobalVariables.blueDarkColor.withOpacity(0.1)
                     : Colors.white,
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: seleccionado
-                      ? _blueDarkColor
+                      ? GlobalVariables.blueDarkColor
                       : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
               child: Icon(
                 icono,
-                color: seleccionado ? _blueDarkColor : Colors.grey.shade600,
+                color: seleccionado ? GlobalVariables.blueDarkColor : Colors.grey.shade600,
                 size: 20,
               ),
             ),
@@ -1117,6 +1144,84 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     );
   }
 
+  // ✅ NUEVO MÉTODO: TEXTO EXPLICATIVO DEL TIPO DE RELACIÓN (REPLICADO DE LA VISTA 1)
+  Widget _buildInfoTipoRelacion(String tipoRelacion) {
+    final Map<String, Map<String, String>> infoTipos = {
+      'autorizador': {
+        'titulo': 'Autorizador',
+        'descripcion':
+        'Eres una persona autorizada para realizar compras en nombre de la empresa.',
+        'permisos': '• Autorizar compras\n• Consultar historial\n• Ver líneas de crédito',
+      },
+      'representante': {
+        'titulo': 'Representante Legal',
+        'descripcion':
+        'Eres el representante legal de la empresa con permisos administrativos completos.',
+        'permisos': '• Todas las funciones de autorizador\n• Gestionar autorizadores',
+      },
+    };
+
+    final info = infoTipos[tipoRelacion]!;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: GlobalVariables.blueDarkColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: GlobalVariables.blueDarkColor.withOpacity(0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: GlobalVariables.blueDarkColor,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                info['titulo']!,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: GlobalVariables.blueDarkColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            info['descripcion']!,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            info['permisos']!,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasValidRut = _rutController.text.isNotEmpty && _rutError.isEmpty;
@@ -1127,7 +1232,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _blueDarkColor),
+          icon: Icon(Icons.arrow_back, color: GlobalVariables.blueDarkColor),
           onPressed: () => Navigator.pop(context),
         ),
         title: Image.asset(
@@ -1150,7 +1255,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: _blueDarkColor,
+                  color: GlobalVariables.blueDarkColor,
                 ),
               ),
               const SizedBox(height: 8),
@@ -1169,6 +1274,12 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
               const SizedBox(height: 24),
 
               _buildSelectorTipoRelacion(),
+
+              // ✅ TEXTO EXPLICATIVO AGREGADO (SOLO CUANDO HAY SELECCIÓN)
+              if (_tipoRelacionSeleccionada != null) ...[
+                const SizedBox(height: 16),
+                _buildInfoTipoRelacion(_tipoRelacionSeleccionada!),
+              ],
 
               const SizedBox(height: 24),
 
@@ -1194,85 +1305,48 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'RUT de empresa',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: hasValidRut ? _blueDarkColor.withOpacity(0.3) : Colors.grey.shade400,
-            ),
-            color: Colors.grey.shade50,
-          ),
-          child: Row(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: Icon(
-                  Icons.business_outlined,
-                  size: 20,
-                  color: Colors.grey.shade600,
+        TextFormField(
+          controller: _rutController,
+          focusNode: _rutFocusNode,
+          onChanged: _onRutChanged,
+          keyboardType: TextInputType.text,
+          textInputAction: TextInputAction.done,
+          decoration: GlobalInputStyles.inputDecoration(
+            labelText: 'RUT de empresa',
+            hintText: 'Ej: 12.345.678-9',
+            prefixIcon: Icons.business_outlined,
+            suffixIcon: hasValidRut
+                ? SizedBox(
+              width: 48,
+              height: 48,
+              child: Center(
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF4CAF50),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 12,
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  controller: _rutController,
-                  focusNode: _rutFocusNode,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: 'Ej: 12.345.678-9',
-                    contentPadding: EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onChanged: _onRutChanged,
-                  keyboardType: TextInputType.text,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                  ),
-                  textInputAction: TextInputAction.done,
-                ),
-              ),
-              if (hasValidRut)
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Container(
-                    width: 20, // ✅ EXACTO MISMO TAMAÑO
-                    height: 20, // ✅ EXACTO MISMO TAMAÑO
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF4CAF50), // ✅ MISMO VERDE
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 14, // ✅ MISMO TAMAÑO DE ÍCONO
-                    ),
-                  ),
-                ),
-              const SizedBox(width: 8),
-            ],
+            )
+                : null,
           ),
+          style: const TextStyle(color: Colors.black, fontSize: 16),
         ),
-
-        if (_rutError.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            _rutError,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 14,
+        if (_rutError.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 12),
+            child: Text(
+              _rutError,
+              style: const TextStyle(color: Colors.red, fontSize: 14),
             ),
           ),
-        ],
       ],
     );
   }
@@ -1289,7 +1363,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: _blueDarkColor,
+            color: GlobalVariables.blueDarkColor,
           ),
         ),
         const SizedBox(height: 16),
@@ -1351,7 +1425,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCompleted
-              ? _blueDarkColor.withOpacity(0.5)
+              ? GlobalVariables.blueDarkColor.withOpacity(0.5)
               : (isFaceCardDisabled
               ? Colors.grey.shade400  // Borde gris para Rostro desactivado
               : Colors.grey.shade300),
@@ -1383,11 +1457,11 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                   height: 70,
                   decoration: BoxDecoration(
                     color: isCompleted
-                        ? _blueDarkColor.withOpacity(0.15)
+                        ? GlobalVariables.blueDarkColor.withOpacity(0.15)
                         : (isFaceCardDisabled
                         ? Colors.grey.shade300  // Fondo gris para ícono desactivado
                         : (isEnabled
-                        ? _blueDarkColor.withOpacity(0.1)
+                        ? GlobalVariables.blueDarkColor.withOpacity(0.1)
                         : Colors.grey.shade300)),
                     shape: BoxShape.circle,
                   ),
@@ -1395,11 +1469,11 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                     icon,
                     size: 36,
                     color: isCompleted
-                        ? _blueDarkColor
+                        ? GlobalVariables.blueDarkColor
                         : (isFaceCardDisabled
                         ? Colors.grey.shade500  // Ícono gris para Rostro desactivado
                         : (isEnabled
-                        ? _blueDarkColor
+                        ? GlobalVariables.blueDarkColor
                         : Colors.grey.shade600)),
                   ),
                 ),
@@ -1415,11 +1489,11 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                       height: 24,
                       decoration: BoxDecoration(
                         color: isCompleted
-                            ? _blueDarkColor
+                            ? GlobalVariables.blueDarkColor
                             : (isFaceCardDisabled
                             ? Colors.grey.shade500  // Círculo del número gris
                             : (isEnabled
-                            ? _blueDarkColor
+                            ? GlobalVariables.blueDarkColor
                             : Colors.grey.shade400)),
                         shape: BoxShape.circle,
                       ),
@@ -1460,7 +1534,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                     style: TextStyle(
                       fontSize: 14,
                       color: isCompleted
-                          ? _blueDarkColor
+                          ? GlobalVariables.blueDarkColor
                           : (isFaceCardDisabled
                           ? Colors.grey.shade500  // Estado en gris
                           : (isEnabled
@@ -1491,7 +1565,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
       child: ElevatedButton(
         onPressed: _isLoading || !canRequest ? null : _solicitarLineaCredito,
         style: ElevatedButton.styleFrom(
-          backgroundColor: canRequest ? _blueDarkColor : Colors.grey.shade400,
+          backgroundColor: canRequest ? GlobalVariables.blueDarkColor : Colors.grey.shade400,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -1541,7 +1615,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
         if (_isLoading || _showLocalLoading) ...[
           LinearProgressIndicator(
             backgroundColor: Colors.grey.shade200,
-            valueColor: AlwaysStoppedAnimation<Color>(_blueDarkColor),
+            valueColor: AlwaysStoppedAnimation<Color>(GlobalVariables.blueDarkColor),
           ),
           const SizedBox(height: 16),
           Text(

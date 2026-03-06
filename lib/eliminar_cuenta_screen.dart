@@ -3,11 +3,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'variables_globales.dart';
+import 'variables_globales.dart'; // ✅ Estilos y colores globales
 
-// ✅ COLOR AZUL OSCURO DEFINIDO GLOBALMENTE
-final Color _blueDarkColor = const Color(0xFF0055B8);
-// ✅ COLOR DE FONDO DE TARJETAS APROBADAS
+// ✅ Color de fondo específico para esta tarjeta (se mantiene local)
 final Color _approvedCardBackground = const Color(0xFFE8F0FE);
 
 class EliminarCuentaScreen extends StatefulWidget {
@@ -55,14 +53,16 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
         });
       } else {
         print('⚠️ No se pudo obtener token FCM, usando fallback');
-        final String fallbackToken = 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
+        final String fallbackToken =
+            'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
         setState(() {
           _deviceToken = fallbackToken;
         });
       }
     } catch (e) {
       print('❌ Error obteniendo token FCM: $e');
-      final String errorToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
+      final String errorToken =
+          'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
       setState(() {
         _deviceToken = errorToken;
       });
@@ -101,7 +101,8 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
   }
 
   // ✅ VERIFICAR SI EL BOTÓN DEBE ESTAR HABILITADO
-  bool get _botonHabilitado => _deviceToken != null && _contrasenaValida && !_isLoading;
+  bool get _botonHabilitado =>
+      _deviceToken != null && _contrasenaValida && !_isLoading;
 
   // ✅ ELIMINAR CUENTA
   Future<void> _eliminarCuenta() async {
@@ -109,7 +110,7 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
 
     // Extraer RUN y DV
     final runDv = _extraerRunYDv();
-
+    final motivo = "1";
     setState(() {
       _isLoading = true;
     });
@@ -120,8 +121,9 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
         "run_comprador": runDv['run'],
         "dv_comprador": runDv['dv'],
         "token_dispositivo": _deviceToken!,
-        "correo_comprador": widget.email, // ✅ AGREGADO
-        "password_comprador": _contrasenaController.text.trim(), // ✅ AGREGADO
+        "correo_comprador": widget.email,
+        "password_comprador": _contrasenaController.text.trim(),
+        "motivo_eliminacion": motivo
       };
 
       print('📤 Request EliminarUsuario (v1):');
@@ -145,14 +147,16 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
 
-        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
-          _mostrarError('Sesión cerrada. Por favor, inicia sesión nuevamente.');
+        if (responseData['success'] == false &&
+            responseData['sesion_iniciada'] == false) {
+          GlobalSnackBars.mostrarError(
+              context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
           _reiniciarAplicacion();
           return;
         }
 
         if (responseData['success'] == true) {
-          _mostrarExito('Cuenta eliminada exitosamente');
+          GlobalSnackBars.mostrarExito(context, 'Cuenta eliminada exitosamente');
 
           await Future.delayed(const Duration(seconds: 1));
           _reiniciarAplicacion();
@@ -165,22 +169,26 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
           if (codigoError == 'CONTRASENA_INCORRECTA') {
             mensajeUsuario = 'Contraseña incorrecta';
           } else if (codigoError == 'CUENTA_CON_DEUDAS') {
-            mensajeUsuario = 'No puedes eliminar la cuenta con deudas pendientes';
+            mensajeUsuario =
+            'No puedes eliminar la cuenta con deudas pendientes';
           } else if (codigoError == 'CUENTA_CON_ACTIVIDAD_RECIENTE') {
-            mensajeUsuario = 'Hay actividad reciente en la cuenta. Intenta más tarde.';
+            mensajeUsuario =
+            'Hay actividad reciente en la cuenta. Intenta más tarde.';
           }
 
-          _mostrarError(mensajeUsuario);
+          GlobalSnackBars.mostrarError(context, mensajeUsuario);
         }
       } else if (response.statusCode == 401) {
-        _mostrarError('Sesión cerrada. Por favor, inicia sesión nuevamente.');
+        GlobalSnackBars.mostrarError(
+            context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
         _reiniciarAplicacion();
       } else {
-        _mostrarError('Error del servidor: ${response.statusCode}');
+        GlobalSnackBars.mostrarError(
+            context, 'Error del servidor: ${response.statusCode}');
       }
     } catch (e) {
       print('❌ Error eliminando cuenta: $e');
-      _mostrarError('Error de conexión: $e');
+      GlobalSnackBars.mostrarError(context, 'Error de conexión: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -198,30 +206,6 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
     );
   }
 
-  void _mostrarError(String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensaje, style: const TextStyle(color: Colors.white)),
-        backgroundColor: Colors.grey[800],
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-
-  void _mostrarExito(String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensaje, style: const TextStyle(color: Colors.white)),
-        backgroundColor: Colors.grey[800],
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -230,7 +214,7 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _blueDarkColor),
+          icon: Icon(Icons.arrow_back, color: GlobalVariables.blueDarkColor),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -238,7 +222,7 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: _blueDarkColor,
+            color: GlobalVariables.blueDarkColor,
           ),
         ),
         centerTitle: true,
@@ -251,7 +235,7 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ✅ ÚNICA TARJETA CON TODO EL CONTENIDO
+                // ✅ TARJETA DE CONFIRMACIÓN
                 Container(
                   decoration: BoxDecoration(
                     color: _approvedCardBackground,
@@ -271,10 +255,11 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ✅ ADVERTENCIA
+                        // ADVERTENCIA
                         Row(
                           children: [
-                            Icon(Icons.warning_amber_outlined, color: Colors.red.shade700),
+                            Icon(Icons.warning_amber_outlined,
+                                color: Colors.red.shade700),
                             const SizedBox(width: 8),
                             Text(
                               'Advertencia',
@@ -297,7 +282,7 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // ✅ CAMPO DE CONTRASEÑA
+                        // CAMPO DE CONTRASEÑA CON ESTILO GLOBAL
                         Text(
                           'Para confirmar, ingresa tu contraseña:',
                           style: TextStyle(
@@ -310,26 +295,15 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
                         TextFormField(
                           controller: _contrasenaController,
                           obscureText: !_mostrarContrasena,
-                          decoration: InputDecoration(
-                            hintText: 'Ingresa contraseña',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade400),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: Colors.grey.shade400),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(color: _blueDarkColor, width: 2),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            prefixIcon: Icon(Icons.lock_outline, size: 20, color: Colors.grey.shade600),
+                          decoration: GlobalInputStyles.inputDecoration(
+                            labelText: 'Contraseña',
+                            hintText: 'Ingresa tu contraseña',
+                            prefixIcon: Icons.lock_outline,
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _mostrarContrasena ? Icons.visibility_off : Icons.visibility,
+                                _mostrarContrasena
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
                                 size: 20,
                                 color: Colors.grey.shade600,
                               ),
@@ -357,7 +331,8 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
                   child: ElevatedButton(
                     onPressed: _botonHabilitado ? _eliminarCuenta : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _botonHabilitado ? Colors.red : Colors.grey.shade400,
+                      backgroundColor:
+                      _botonHabilitado ? Colors.red : Colors.grey.shade400,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -374,7 +349,8 @@ class _EliminarCuentaScreenState extends State<EliminarCuentaScreen> {
                         : const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.delete_forever, size: 20, color: Colors.white),
+                        Icon(Icons.delete_forever,
+                            size: 20, color: Colors.white),
                         SizedBox(width: 8),
                         Text(
                           'Eliminar Cuenta',

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'variables_globales.dart';
+import 'variables_globales.dart'; // Contiene GlobalVariables, GlobalInputStyles, GlobalSnackBars
 
 // ✅ COLORES GLOBALES (MISMO QUE PERFIL)
 final Color _blueDarkColor = const Color(0xFF0055B8);
@@ -58,7 +58,6 @@ class FCMTokenManager {
         return fcmToken;
       } else {
         print('⚠️ Token FCM es null, reintentando...');
-        // Esperar un momento y reintentar
         await Future.delayed(const Duration(seconds: 1));
         fcmToken = await FirebaseMessaging.instance.getToken();
 
@@ -196,11 +195,11 @@ class OptionsModal {
     );
   }
 
-  // ✅ NUEVO: CREAR VISTA DE NUEVA EMPRESA
+  // ✅ NUEVO: CREAR VISTA DE NUEVA EMPRESA (AHORA CON PIN)
   static Widget crearVistaNuevaEmpresa({
     required BuildContext context,
     required Map<String, dynamic> userData,
-    required Function(String, String) onAgregarEmpresa,
+    required Function(String, String, String) onAgregarEmpresa, // Ahora incluye pin
     required VoidCallback onVolver,
     required VoidCallback onReiniciarApp,
     required VoidCallback onActualizarDashboard,
@@ -520,25 +519,20 @@ class OptionsModal {
     try {
       String cleanRut = rut.replaceAll('.', '').replaceAll('-', '').toUpperCase();
 
-      // Verificar longitud mínima
       if (cleanRut.length < 8) return false;
 
       String numero = cleanRut.substring(0, cleanRut.length - 1);
       String dv = cleanRut.substring(cleanRut.length - 1);
 
-      // Verificar que el número tenga al menos 7 dígitos
       if (numero.length < 7) return false;
 
-      // Verificar que el número sea válido
       if (int.tryParse(numero) == null) return false;
 
-      // ✅ NUEVA VALIDACIÓN: El RUT debe ser mayor o igual a 1.000.000
       int rutNumerico = int.parse(numero);
       if (rutNumerico < 1000000) {
         return false;
       }
 
-      // Validar dígito verificador
       String expectedDv = _calculateDv(numero);
       return dv == expectedDv;
     } catch (e) {
@@ -604,11 +598,11 @@ class OptionsModal {
   }
 }
 
-// ✅ CLASE PARA LA PANTALLA DE NUEVA EMPRESA
+// ✅ CLASE PARA LA PANTALLA DE NUEVA EMPRESA (MODIFICADA PARA INCLUIR PIN)
 class _NuevaEmpresaScreen extends StatefulWidget {
   final BuildContext context;
   final Map<String, dynamic> userData;
-  final Function(String, String) onAgregarEmpresa;
+  final Function(String, String, String) onAgregarEmpresa; // Ahora recibe pin
   final VoidCallback onVolver;
   final VoidCallback onReiniciarApp;
   final VoidCallback onActualizarDashboard;
@@ -628,10 +622,14 @@ class _NuevaEmpresaScreen extends StatefulWidget {
 
 class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
   final TextEditingController _rutController = TextEditingController();
+  final TextEditingController _pinController = TextEditingController(); // Nuevo controlador para el pin
+  bool _obscurePin = true; // Para mostrar/ocultar el pin
   String? _tipoRelacionSeleccionada;
   bool _isLoading = false;
   bool _rutValido = false;
-  String _mensajeValidacion = '';
+  bool _pinValido = false; // Nueva validación para el pin
+  String _mensajeValidacionRut = '';
+  String _mensajeValidacionPin = ''; // Mensaje para el pin
 
   @override
   Widget build(BuildContext context) {
@@ -677,9 +675,14 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
             _buildInfoTipoRelacion(_tipoRelacionSeleccionada!),
           ],
 
+          const SizedBox(height: 24),
+
+          // ✅ NUEVO CAMPO DE PIN DE SEGURIDAD
+          _buildPinField(),
+
           const SizedBox(height: 32),
 
-          // ✅ BOTÓN DE AGREGAR
+          // ✅ BOTÓN DE AGREGAR (ahora validando también el pin)
           _buildBotonAgregar(),
 
           const SizedBox(height: 40),
@@ -698,14 +701,6 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
             fontSize: 16,
             fontWeight: FontWeight.w600,
             color: _blueDarkColor,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Formato: con puntos y guión (ej: 12.345.678-9)',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
           ),
         ),
         const SizedBox(height: 12),
@@ -749,17 +744,17 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
 
             setState(() {
               _rutValido = valido && mensajeDuplicado.isEmpty;
-              _mensajeValidacion = mensajeDuplicado.isNotEmpty
+              _mensajeValidacionRut = mensajeDuplicado.isNotEmpty
                   ? mensajeDuplicado
                   : (valido ? 'RUT válido' : 'RUT inválido');
             });
           },
         ),
 
-        if (_mensajeValidacion.isNotEmpty) ...[
+        if (_mensajeValidacionRut.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            _mensajeValidacion,
+            _mensajeValidacionRut,
             style: TextStyle(
               fontSize: 12,
               color: _rutValido ? Colors.green : Colors.red,
@@ -1022,70 +1017,146 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
     final info = infoTipos[tipoRelacion]!;
 
     return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _blueDarkColor.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: _blueDarkColor.withOpacity(0.2),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _blueDarkColor.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _blueDarkColor.withOpacity(0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: _blueDarkColor,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                info['titulo']!,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                   color: _blueDarkColor,
-                  size: 16,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  info['titulo']!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: _blueDarkColor,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              info['descripcion']!,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade700,
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            info['descripcion']!,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade700,
             ),
-            const SizedBox(height: 8),
-            Text(
-              info['permisos']!,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey.shade600,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            info['permisos']!,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade600,
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NUEVO: Campo de pin de seguridad con estilos globales
+  Widget _buildPinField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Pin de seguridad',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: _blueDarkColor,
+          ),
         ),
-      );
-    }
+        const SizedBox(height: 8),
+        Text(
+          '4 dígitos numéricos',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _pinController,
+          obscureText: _obscurePin,
+          keyboardType: TextInputType.number,
+          decoration: GlobalInputStyles.inputDecoration(
+            labelText: 'Pin de seguridad',
+            prefixIcon: Icons.lock_outline,
+          ).copyWith(
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePin ? Icons.visibility_off : Icons.visibility,
+                color: Colors.grey,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePin = !_obscurePin;
+                });
+              },
+            ),
+          ),
+          onChanged: _validarPin,
+        ),
+        if (_mensajeValidacionPin.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            _mensajeValidacionPin,
+            style: TextStyle(
+              fontSize: 12,
+              color: _pinValido ? Colors.green : Colors.red,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _validarPin(String value) {
+    // Validación: solo números y al menos 4 dígitos
+    final esNumerico = RegExp(r'^[0-9]+$').hasMatch(value);
+    final longitudValida = value.length >= 4;
+
+    setState(() {
+      _pinValido = esNumerico && longitudValida;
+      _mensajeValidacionPin = _pinValido
+          ? 'Pin válido'
+          : (value.isEmpty
+          ? 'Ingrese un pin'
+          : (!esNumerico
+          ? 'Solo se permiten números'
+          : 'Debe tener al menos 4 dígitos'));
+    });
+  }
 
   Widget _buildBotonAgregar() {
     return SizedBox(
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: (_rutValido && _tipoRelacionSeleccionada != null && !_isLoading)
+        onPressed: (_rutValido && _tipoRelacionSeleccionada != null && _pinValido && !_isLoading)
             ? () async {
           setState(() {
             _isLoading = true;
@@ -1094,9 +1165,10 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
           try {
             final rut = _rutController.text.trim();
             final tipoRelacion = _tipoRelacionSeleccionada!;
+            final pin = _pinController.text.trim(); // Obtener el pin
 
-            // ✅ LLAMAR AL MÉTODO DEL DASHBOARD
-            await widget.onAgregarEmpresa(rut, tipoRelacion);
+            // ✅ LLAMAR AL MÉTODO DEL DASHBOARD CON EL PIN
+            await widget.onAgregarEmpresa(rut, tipoRelacion, pin);
 
             // ✅ ACTUALIZAR EL DASHBOARD
             widget.onActualizarDashboard();
@@ -1144,7 +1216,9 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
   }
 }
 
-// Clase para la pantalla de autorizadores
+// =============================================================================
+// PANTALLA DE AUTORIZADORES (MODIFICADA PARA INCLUIR PIN EN AGREGAR Y ELIMINAR)
+// =============================================================================
 class _AutorizadoresScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
   final String? empresaSeleccionada;
@@ -1189,7 +1263,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       print('🔄 Inicializando token FCM...');
       await _initializeDeviceToken();
 
-      // Esperar a que el token esté disponible
       int attempts = 0;
       while (_deviceToken == null && attempts < 5) {
         print('⏳ Esperando token FCM... Intento ${attempts + 1}');
@@ -1264,7 +1337,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     }
   }
 
-  // Método para cargar autorizadores desde la API
   Future<void> _cargarAutorizadores() async {
     print('🔄 Cargando autorizadores...');
 
@@ -1331,7 +1403,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // VERIFICAR SI LA SESIÓN HA EXPIRADA
         if (data['success'] == false && data['sesion_iniciada'] == false) {
           mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
           reiniciarAplicacion(context);
@@ -1347,9 +1418,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
             _errorCarga = false;
             _isLoading = false;
           });
-
-          // Mostrar mensaje de éxito
-          //mostrarSnackBar(context, 'Lista actualizada correctamente');
         }
       } else if (response.statusCode == 401) {
         print('🔐 Sesión expirada (401 Unauthorized)');
@@ -1378,7 +1446,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     }
   }
 
-  // ✅ MÉTODO SIMPLE PARA RECARGAR LA LISTA
   void _recargarLista() {
     print('🔄 Recargando lista de autorizadores...');
     if (mounted) {
@@ -1389,8 +1456,8 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     }
   }
 
-  // ✅ MÉTODO PARA ELIMINAR AUTORIZADOR
-  Future<void> _eliminarAutorizador(Map<String, dynamic> autorizador) async {
+  // ✅ ELIMINAR AUTORIZADOR (AHORA CON PIN Y API V3)
+  Future<void> _eliminarAutorizador(Map<String, dynamic> autorizador, String pin) async {
     setState(() {
       _isLoading = true;
     });
@@ -1414,7 +1481,8 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         return;
       }
 
-      final String apiUrl = '${GlobalVariables.baseUrl}/CambiarValidezCompradorDesignado/api/v2/';
+      // ✅ CAMBIO: URL v3 y campo pin_seguridad
+      final String apiUrl = '${GlobalVariables.baseUrl}/CambiarValidezCompradorDesignado/api/v3/';
       final requestBody = {
         'token_representante': tokenRepresentante,
         'run_autorizador': runComprador,
@@ -1422,6 +1490,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         'rut_empresa_autorizador': rutEmpresa,
         'dv_rut_empresa_autorizador': dvRutEmpresa,
         'token_dispositivo': deviceToken,
+        'pin_seguridad': pin, // ← NUEVO CAMPO
       };
 
       print('📡 Enviando request para eliminar autorizador...');
@@ -1439,7 +1508,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // VERIFICAR SI LA SESIÓN HA EXPIRADA
         if (data['success'] == false && data['sesion_iniciada'] == false) {
           mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
           reiniciarAplicacion(context);
@@ -1475,93 +1543,420 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
 
   void _mostrarDialogoAgregarAutorizador() {
     print('🔍 Abriendo diálogo para agregar autorizador');
+    _mostrarDialogoNuevoAutorizadorConPin(); // ← LLAMA A LA NUEVA VERSIÓN CON PIN
+  }
 
-    _mostrarDialogoNuevoAutorizador(
+  // ✅ NUEVO DIÁLOGO PARA AGREGAR AUTORIZADOR CON CAMPO DE PIN
+  void _mostrarDialogoNuevoAutorizadorConPin() {
+    final TextEditingController runController = TextEditingController();
+    final TextEditingController pinController = TextEditingController();
+    bool runValido = false;
+    bool pinValido = false;
+    bool obscurePin = true;
+    String mensajeValidacionRun = '';
+    String mensajeValidacionPin = '';
+
+    showDialog(
       context: context,
-      userData: widget.userData,
-      onAsignarAutorizador: widget.onAsignarAutorizador,
-      onReiniciarApp: widget.onReiniciarApp,
-      autorizadoresExistentes: _autorizadores,
-      onActualizarAutorizadores: _recargarLista,
+      useRootNavigator: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Asignar Nuevo Autorizador',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _blueDarkColor,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Campo RUN
+                      Text(
+                        'RUN',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _blueDarkColor,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: runController,
+                        decoration: InputDecoration(
+                          labelText: 'RUN (ej: 12345678-9)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                          suffixIcon: runController.text.isNotEmpty
+                              ? Icon(
+                            runValido ? Icons.check_circle : Icons.error,
+                            color: runValido ? Colors.green : Colors.red,
+                          )
+                              : null,
+                        ),
+                        onChanged: (value) {
+                          final formattedRun = OptionsModal._formatRut(value);
+                          if (formattedRun != value) {
+                            runController.value = TextEditingValue(
+                              text: formattedRun,
+                              selection: TextSelection.collapsed(offset: formattedRun.length),
+                            );
+                          }
+
+                          final valido = OptionsModal._validateRut(formattedRun);
+
+                          if (valido) {
+                            final comprador = widget.userData['comprador'];
+                            if (comprador != null) {
+                              final runComprador = comprador['run_comprador']?.toString() ?? '';
+                              final dvComprador = comprador['dv_run_comprador']?.toString() ?? '';
+                              final runCompletoComprador = '$runComprador-$dvComprador';
+                              final runFormateadoComprador = OptionsModal._formatRut(runCompletoComprador);
+
+                              if (formattedRun == runFormateadoComprador) {
+                                setState(() {
+                                  runValido = false;
+                                  mensajeValidacionRun = 'No puedes usar tu propio RUN';
+                                });
+                                return;
+                              }
+                            }
+
+                            final runParseado = OptionsModal._parseRut(formattedRun);
+                            final runNumero = runParseado['numero'] ?? '';
+                            final runDv = runParseado['dv'] ?? '';
+
+                            bool yaRegistrado = false;
+                            for (var autorizador in _autorizadores) {
+                              final runExistente = autorizador['run_comprador']?.toString() ?? '';
+                              final dvExistente = autorizador['dv_run_comprador']?.toString() ?? '';
+
+                              if (runExistente == runNumero && dvExistente == runDv) {
+                                yaRegistrado = true;
+                                break;
+                              }
+
+                              final runCompletoExistente = '$runExistente-$dvExistente';
+                              if (OptionsModal._formatRut(runCompletoExistente) == formattedRun) {
+                                yaRegistrado = true;
+                                break;
+                              }
+                            }
+
+                            if (yaRegistrado) {
+                              setState(() {
+                                runValido = false;
+                                mensajeValidacionRun = 'Este RUN ya está registrado como autorizador';
+                              });
+                              return;
+                            }
+                          }
+
+                          setState(() {
+                            runValido = valido;
+                            mensajeValidacionRun = valido ? 'RUN válido y disponible' : 'RUN inválido';
+                          });
+                        },
+                      ),
+                      if (mensajeValidacionRun.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          mensajeValidacionRun,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: runValido ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 16),
+
+                      // Campo PIN (nuevo)
+                      Text(
+                        'Pin de seguridad',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _blueDarkColor,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: pinController,
+                        obscureText: obscurePin,
+                        keyboardType: TextInputType.number,
+                        decoration: GlobalInputStyles.inputDecoration(
+                          labelText: 'Pin de seguridad',
+                          prefixIcon: Icons.lock_outline,
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscurePin ? Icons.visibility_off : Icons.visibility,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                obscurePin = !obscurePin;
+                              });
+                            },
+                          ),
+                        ),
+                        onChanged: (value) {
+                          final esNumerico = RegExp(r'^[0-9]+$').hasMatch(value);
+                          final longitudValida = value.length == 4; // Exactamente 4 dígitos
+                          setState(() {
+                            pinValido = esNumerico && longitudValida;
+                            mensajeValidacionPin = pinValido
+                                ? 'Pin válido'
+                                : (value.isEmpty
+                                ? 'Ingrese el pin'
+                                : (!esNumerico
+                                ? 'Solo números'
+                                : 'Debe tener 4 dígitos'));
+                          });
+                        },
+                      ),
+                      if (mensajeValidacionPin.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          mensajeValidacionPin,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: pinValido ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+
+                      // Botones
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _blueDarkColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text('Cancelar'),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: (runValido && pinValido)
+                                ? () async {
+                              final run = runController.text.trim();
+                              final pin = pinController.text.trim();
+                              print('✅ Confirmado: Agregando autorizador con RUN: $run y PIN: $pin');
+
+                              final BuildContext dialogContext = context;
+                              Navigator.of(dialogContext, rootNavigator: true).pop();
+
+                              try {
+                                await _asignarAutorizadorApi(
+                                  context: dialogContext,
+                                  userData: widget.userData,
+                                  run: run,
+                                  pin: pin, // ← NUEVO PARÁMETRO
+                                  onAsignarAutorizador: widget.onAsignarAutorizador,
+                                  onReiniciarApp: widget.onReiniciarApp,
+                                  onActualizarAutorizadores: widget.onActualizarAutorizadores,
+                                );
+                              } catch (e) {
+                                print('❌ Error en diálogo: $e');
+                              }
+                            }
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _blueDarkColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text('Asignar'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
+  // ✅ DIÁLOGO PARA ELIMINAR AUTORIZADOR CON CAMPO DE PIN
   void _mostrarDialogoEliminarAutorizador(Map<String, dynamic> autorizador) {
     final nombre = autorizador['nombre_comprador'] ?? 'Sin nombre';
     final runComprador = autorizador['run_comprador']?.toString() ?? '';
     final dvRunComprador = autorizador['dv_run_comprador']?.toString() ?? '';
     final runFormateado = OptionsModal._formatRut('$runComprador-$dvRunComprador');
 
+    final TextEditingController pinController = TextEditingController();
+    bool pinValido = false;
+    bool obscurePin = true;
+    String mensajeValidacionPin = '';
+
     showDialog(
       context: context,
       useRootNavigator: true,
       builder: (context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Eliminar Autorizador',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: _blueDarkColor,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '¿Estás seguro de eliminar a "$nombre" (${runFormateado.isNotEmpty ? runFormateado : 'RUN no disponible'})?',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade800,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ElevatedButton(
-                      onPressed: () {
-                        print('❌ Eliminación cancelada');
-                        Navigator.of(context, rootNavigator: true).pop();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _blueDarkColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                    Text(
+                      'Eliminar Autorizador',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _blueDarkColor,
                       ),
-                      child: const Text('Cancelar'),
                     ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: () async {
-                        print('✅ Iniciando eliminación de: $nombre');
-                        Navigator.of(context, rootNavigator: true).pop();
-                        await _eliminarAutorizador(autorizador);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _blueDarkColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    const SizedBox(height: 16),
+                    Text(
+                      '¿Estás seguro de eliminar a "$nombre" (${runFormateado.isNotEmpty ? runFormateado : 'RUN no disponible'})?',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade800,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Campo PIN para confirmar eliminación
+                    Text(
+                      'Ingresa tu pin de seguridad',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _blueDarkColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: pinController,
+                      obscureText: obscurePin,
+                      keyboardType: TextInputType.number,
+                      decoration: GlobalInputStyles.inputDecoration(
+                        labelText: 'Pin de seguridad',
+                        prefixIcon: Icons.lock_outline,
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePin ? Icons.visibility_off : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscurePin = !obscurePin;
+                            });
+                          },
                         ),
                       ),
-                      child: const Text('Eliminar'),
+                      onChanged: (value) {
+                        final esNumerico = RegExp(r'^[0-9]+$').hasMatch(value);
+                        final longitudValida = value.length == 4;
+                        setState(() {
+                          pinValido = esNumerico && longitudValida;
+                          mensajeValidacionPin = pinValido
+                              ? 'Pin válido'
+                              : (value.isEmpty
+                              ? 'Ingrese el pin'
+                              : (!esNumerico
+                              ? 'Solo números'
+                              : 'Debe tener 4 dígitos'));
+                        });
+                      },
+                    ),
+                    if (mensajeValidacionPin.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        mensajeValidacionPin,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: pinValido ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            print('❌ Eliminación cancelada');
+                            Navigator.of(context, rootNavigator: true).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _blueDarkColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Cancelar'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: pinValido
+                              ? () async {
+                            print('✅ Iniciando eliminación de: $nombre');
+                            final pin = pinController.text.trim();
+                            Navigator.of(context, rootNavigator: true).pop();
+                            await _eliminarAutorizador(autorizador, pin);
+                          }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _blueDarkColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Eliminar'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1776,7 +2171,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                   icon: Icon(Icons.close, color: Colors.red, size: 18),
                   onPressed: () {
                     print('❌ Eliminando autorizador: $nombre');
-                    _mostrarDialogoEliminarAutorizador(autorizador);
+                    _mostrarDialogoEliminarAutorizador(autorizador); // ← AHORA USA EL NUEVO DIÁLOGO CON PIN
                   },
                   padding: EdgeInsets.zero,
                   splashRadius: 20,
@@ -1948,224 +2343,21 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     );
   }
 
-  // ✅ MÉTODO PARA MOSTRAR DIÁLOGO DE NUEVO AUTORIZADOR
-  void _mostrarDialogoNuevoAutorizador({
-    required BuildContext context,
-    required Map<String, dynamic> userData,
-    required Function(String) onAsignarAutorizador,
-    required VoidCallback onReiniciarApp,
-    required List<Map<String, dynamic>> autorizadoresExistentes,
-    required VoidCallback onActualizarAutorizadores,
-  }) {
-    final TextEditingController runController = TextEditingController();
-    bool runValido = false;
-    String mensajeValidacion = '';
-
-    showDialog(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Asignar Nuevo Autorizador',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _blueDarkColor,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Formato: sin puntos, con guión y dígito verificador',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: runController,
-                      decoration: InputDecoration(
-                        labelText: 'RUN (ej: 12345678-9)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        suffixIcon: runController.text.isNotEmpty
-                            ? Icon(
-                          runValido ? Icons.check_circle : Icons.error,
-                          color: runValido ? Colors.green : Colors.red,
-                        )
-                            : null,
-                      ),
-                      onChanged: (value) {
-                        final formattedRun = OptionsModal._formatRut(value);
-                        if (formattedRun != value) {
-                          runController.value = TextEditingValue(
-                            text: formattedRun,
-                            selection: TextSelection.collapsed(offset: formattedRun.length),
-                          );
-                        }
-
-                        final valido = OptionsModal._validateRut(formattedRun);
-
-                        if (valido) {
-                          // VERIFICAR SI ES EL RUN DEL USUARIO ACTUAL
-                          final comprador = userData['comprador'];
-                          if (comprador != null) {
-                            final runComprador = comprador['run_comprador']?.toString() ?? '';
-                            final dvComprador = comprador['dv_run_comprador']?.toString() ?? '';
-                            final runCompletoComprador = '$runComprador-$dvComprador';
-                            final runFormateadoComprador = OptionsModal._formatRut(runCompletoComprador);
-
-                            if (formattedRun == runFormateadoComprador) {
-                              setState(() {
-                                runValido = false;
-                                mensajeValidacion = 'No puedes usar tu propio RUN';
-                              });
-                              return;
-                            }
-                          }
-
-                          // VERIFICAR SI EL RUN YA ESTÁ REGISTRADO
-                          final runParseado = OptionsModal._parseRut(formattedRun);
-                          final runNumero = runParseado['numero'] ?? '';
-                          final runDv = runParseado['dv'] ?? '';
-
-                          bool yaRegistrado = false;
-                          for (var autorizador in autorizadoresExistentes) {
-                            final runExistente = autorizador['run_comprador']?.toString() ?? '';
-                            final dvExistente = autorizador['dv_run_comprador']?.toString() ?? '';
-
-                            if (runExistente == runNumero && dvExistente == runDv) {
-                              yaRegistrado = true;
-                              break;
-                            }
-
-                            final runCompletoExistente = '$runExistente-$dvExistente';
-                            if (OptionsModal._formatRut(runCompletoExistente) == formattedRun) {
-                              yaRegistrado = true;
-                              break;
-                            }
-                          }
-
-                          if (yaRegistrado) {
-                            setState(() {
-                              runValido = false;
-                              mensajeValidacion = 'Este RUN ya está registrado como autorizador';
-                            });
-                            return;
-                          }
-                        }
-
-                        setState(() {
-                          runValido = valido;
-                          mensajeValidacion = valido ? 'RUN válido y disponible' : 'RUN inválido';
-                        });
-                      },
-                    ),
-                    if (mensajeValidacion.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        mensajeValidacion,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: runValido ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _blueDarkColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Cancelar'),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: runValido
-                              ? () async {
-                            final run = runController.text.trim();
-                            print('✅ Confirmado: Agregando autorizador con RUN: $run');
-
-                            // GUARDAR EL CONTEXTO ANTES DE CERRAR EL DIÁLOGO
-                            final BuildContext dialogContext = context;
-
-                            // Cerrar el diálogo primero
-                            Navigator.of(dialogContext, rootNavigator: true).pop();
-
-                            try {
-                              await _asignarAutorizadorApi(
-                                context: dialogContext,
-                                userData: userData,
-                                run: run,
-                                onAsignarAutorizador: onAsignarAutorizador,
-                                onReiniciarApp: onReiniciarApp,
-                                onActualizarAutorizadores: onActualizarAutorizadores,
-                              );
-                            } catch (e) {
-                              print('❌ Error en diálogo: $e');
-                              // No mostrar snackbar aquí - ya se maneja en la API
-                            }
-                          }
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _blueDarkColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Asignar'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ✅ MÉTODO PARA ASIGNAR AUTORIZADOR
+  // ✅ ASIGNAR AUTORIZADOR (AHORA CON PIN Y API V3)
   Future<void> _asignarAutorizadorApi({
     required BuildContext context,
     required Map<String, dynamic> userData,
     required String run,
+    required String pin, // ← NUEVO PARÁMETRO
     required Function(String) onAsignarAutorizador,
     required VoidCallback onReiniciarApp,
     required VoidCallback onActualizarAutorizadores,
   }) async {
     print('══════════════════════════════════════════════════════════════');
-    print('🎯 INICIANDO API _asignarAutorizadorApi');
+    print('🎯 INICIANDO API _asignarAutorizadorApi (v3)');
     print('══════════════════════════════════════════════════════════════');
 
     try {
-      // OBTENER TOKEN DEL DISPOSITIVO
       print('🔄 Obteniendo token del dispositivo...');
       final String deviceToken = await FCMTokenManager.getDeviceToken();
 
@@ -2178,7 +2370,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         return;
       }
 
-      // Obtener la empresa seleccionada
       final empresas = userData['empresas'] ?? [];
       final empresaSeleccionada = empresas.firstWhere(
             (emp) => emp['seleccionada'] == true,
@@ -2193,7 +2384,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       final rutEmpresa = empresaSeleccionada['rut_empresa']?.toString() ?? '';
       final dvEmpresa = empresaSeleccionada['dv_rut_empresa']?.toString() ?? '';
 
-      // Parsear RUN del autorizador
       final runParseado = OptionsModal._parseRut(run);
       final runAutorizador = runParseado['numero'] ?? '';
       final dvRunAutorizador = runParseado['dv'] ?? '';
@@ -2203,7 +2393,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         return;
       }
 
-      // Preparar request
+      // ✅ CAMBIO: URL v3 y campo pin_seguridad
       final requestBody = {
         "token_representante": tokenComprador,
         "run_autorizador": runAutorizador,
@@ -2211,11 +2401,13 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         "rut_empresa": rutEmpresa,
         "dv_empresa": dvEmpresa,
         "token_dispositivo": deviceToken,
+        "pin_seguridad": pin, // ← NUEVO CAMPO
       };
 
       print('📡 Enviando request a la API...');
+      print('Request: $requestBody');
       final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/CrearAutorizador/api/v2/'),
+        Uri.parse('${GlobalVariables.baseUrl}/CrearAutorizador/api/v3/'), // ← v3
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -2229,7 +2421,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
 
-        // VERIFICAR SI LA SESIÓN HA EXPIRADO
         if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
           print('🔐 Sesión expirada');
           return;
@@ -2239,10 +2430,8 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
           final mensaje = responseData['message'] ?? 'Autorizador asignado exitosamente';
           print('✅ ÉXITO: $mensaje');
 
-          // EJECUTAR EL CALLBACK DEL AUTORIZADOR
           onAsignarAutorizador(run);
 
-          // LLAMAR AL CALLBACK PARA ACTUALIZAR LA LISTA
           if (onActualizarAutorizadores != null) {
             print('🔄 Ejecutando onActualizarAutorizadores...');
             onActualizarAutorizadores();

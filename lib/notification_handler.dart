@@ -1103,6 +1103,9 @@ class _NotificationOverlayContentState extends State<_NotificationOverlayContent
   }
 }
 
+// =============================================================================
+// PANTALLA DE DETALLE DE NOTIFICACIÓN (MODIFICADA PARA INCLUIR PIN Y TOKEN DISPOSITIVO)
+// =============================================================================
 class NotificationDetailScreen extends StatefulWidget {
   final Map<String, dynamic> notificationData;
   final String notificationTitle;
@@ -1127,6 +1130,12 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
   String _apiResponseMessage = '';
   Map<String, dynamic> _apiResponseData = {};
   late Timer _autoRejectTimer;
+
+  // Controladores para el PIN
+  final TextEditingController _pinController = TextEditingController();
+  bool _pinValido = false;
+  bool _obscurePin = true;
+  String _mensajeValidacionPin = '';
 
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
@@ -1169,6 +1178,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
   void dispose() {
     _autoRejectTimer.cancel();
     _controller.dispose();
+    _pinController.dispose();
     print('🗑️ [NotificationDetailScreen] dispose');
     super.dispose();
   }
@@ -1323,12 +1333,19 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     }
   }
 
+  // ✅ Confirmar compra con PIN y token_dispositivo (CORREGIDO)
   Future<void> _confirmAction(BuildContext context) async {
     print('\n🔄 [NotificationDetailScreen] ========== CONFIRMANDO COMPRA ==========');
 
     if (!_aceptoPoliticas) {
       print('❌ [NotificationDetailScreen] Políticas no aceptadas');
       _mostrarErrorPoliticas();
+      return;
+    }
+
+    if (!_pinValido) {
+      print('❌ [NotificationDetailScreen] PIN inválido');
+      _mostrarErrorPin();
       return;
     }
 
@@ -1342,6 +1359,16 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     });
 
     try {
+      // Obtener token del dispositivo desde NotificationHandler
+      final String? deviceToken = NotificationHandler._deviceToken;
+      if (deviceToken == null || deviceToken.isEmpty) {
+        print('❌ [NotificationDetailScreen] No hay token de dispositivo disponible');
+        _mostrarErrorPin(); // Podría ser otro mensaje
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // ✅ Construir el body con el PIN y token_dispositivo incluidos
       final Map<String, dynamic> requestBody = {
         "token_comprador": widget.notificationData['token_comprador'] ?? '',
         "token_vendedor": widget.notificationData['token_vendedor'] ?? '',
@@ -1358,17 +1385,19 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
         "nombre_vendedor": widget.notificationData['nombre_vendedor'] ?? '',
         "numero_contrato": widget.notificationData['numero_contrato'] ?? '',
         "token_venta": widget.notificationData['token_venta'] ?? '',
+        "token_dispositivo": deviceToken,
+        "pin_seguridad": _pinController.text.trim(),
       };
 
       print('📤 [NotificationDetailScreen] Enviando confirmación:');
-      print('   • URL: ${GlobalVariables.baseUrl}/GuardarCompra/api/v1/');
+      print('   • URL: ${GlobalVariables.baseUrl}/GuardarCompra/api/v2/');
       print('   • Request body:');
       requestBody.forEach((key, value) {
         print('     - $key: $value');
       });
 
       final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/GuardarCompra/api/v1/'),
+        Uri.parse('${GlobalVariables.baseUrl}/GuardarCompra/api/v2/'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -1410,7 +1439,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
       }
 
     } catch (e) {
-      print('❌ [NotificationHandler] Error en _confirmAction: $e');
+      print('❌ [NotificationDetailScreen] Error en _confirmAction: $e');
       _isApproved = false;
       _apiResponseMessage = 'Error de conexión: $e';
     } finally {
@@ -1432,6 +1461,16 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Debe aceptar la política de gestión de cobranza para continuar'),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _mostrarErrorPin() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Debe ingresar un PIN válido de 4 dígitos'),
         backgroundColor: Colors.red,
         duration: Duration(seconds: 3),
       ),
@@ -1468,6 +1507,23 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
       MaterialPageRoute(builder: (context) => DashboardScreen(userData: {})),
           (route) => false,
     );
+  }
+
+  // ✅ Validación del PIN
+  void _validarPin(String value) {
+    final esNumerico = RegExp(r'^[0-9]+$').hasMatch(value);
+    final longitudValida = value.length == 4;
+
+    setState(() {
+      _pinValido = esNumerico && longitudValida;
+      _mensajeValidacionPin = _pinValido
+          ? 'PIN válido'
+          : (value.isEmpty
+          ? 'Ingrese el PIN'
+          : (!esNumerico
+          ? 'Solo números'
+          : 'Debe tener 4 dígitos'));
+    });
   }
 
   Widget _buildApprovedAnimation() {
@@ -1772,13 +1828,62 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                 ),
                 const SizedBox(height: 16),
 
+                // Campo PIN
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pin de seguridad',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _blueDarkColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _pinController,
+                      obscureText: _obscurePin,
+                      keyboardType: TextInputType.number,
+                      decoration: GlobalInputStyles.inputDecoration(
+                        labelText: 'Pin de seguridad',
+                        prefixIcon: Icons.lock_outline,
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePin ? Icons.visibility_off : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePin = !_obscurePin;
+                            });
+                          },
+                        ),
+                      ),
+                      onChanged: _validarPin,
+                    ),
+                    if (_mensajeValidacionPin.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _mensajeValidacionPin,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _pinValido ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
                 const Divider(
                   color: Colors.grey,
                   thickness: 1,
-                  height: 20,
+                  height: 30,
                 ),
-                const SizedBox(height: 16),
 
+                // Checkbox de políticas
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1855,11 +1960,11 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> wit
                   child: SizedBox(
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _aceptoPoliticas && !_isLoading
+                      onPressed: (_aceptoPoliticas && _pinValido && !_isLoading)
                           ? () => _confirmAction(context)
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _aceptoPoliticas && !_isLoading
+                        backgroundColor: (_aceptoPoliticas && _pinValido && !_isLoading)
                             ? _blueDarkColor
                             : Colors.grey.shade400,
                         shape: RoundedRectangleBorder(
