@@ -18,7 +18,7 @@ void mostrarSnackBar(BuildContext context, String mensaje) {
         mensaje,
         style: const TextStyle(color: Colors.white),
       ),
-      backgroundColor: Colors.grey[800], // Color gris oscuro
+      backgroundColor: Colors.grey[800],
       duration: const Duration(seconds: 3),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(
@@ -31,13 +31,11 @@ void mostrarSnackBar(BuildContext context, String mensaje) {
 // ✅ REINICIAR LA APLICACIÓN NAVEGANDO AL MAIN
 void reiniciarAplicacion(BuildContext context) {
   print('🔄 Reiniciando aplicación desde OptionsModal...');
-
   Navigator.pushNamedAndRemoveUntil(
     context,
     '/',
         (route) => false,
   );
-
   if (Navigator.canPop(context)) {
     Navigator.popUntil(context, (route) => route.isFirst);
   }
@@ -49,10 +47,8 @@ class FCMTokenManager {
     try {
       print('🔄 Inicializando Firebase para obtener token...');
       await Firebase.initializeApp();
-
       print('🔄 Obteniendo token FCM...');
       String? fcmToken = await FirebaseMessaging.instance.getToken();
-
       if (fcmToken != null) {
         print('✅ Token FCM obtenido exitosamente');
         return fcmToken;
@@ -60,7 +56,6 @@ class FCMTokenManager {
         print('⚠️ Token FCM es null, reintentando...');
         await Future.delayed(const Duration(seconds: 1));
         fcmToken = await FirebaseMessaging.instance.getToken();
-
         if (fcmToken != null) {
           print('✅ Token FCM obtenido en segundo intento');
           return fcmToken;
@@ -83,7 +78,7 @@ class OptionsModal {
     required BuildContext context,
     required Map<String, dynamic> userData,
     required String? empresaSeleccionada,
-    required Function(String) onCambiarEmpresa,
+    required Function(String) onCambiarEmpresa, // Se mantiene por compatibilidad pero no se usa
     required VoidCallback onMostrarAutorizadores,
     required VoidCallback onMostrarNuevaEmpresa,
     required VoidCallback onReiniciarApp,
@@ -115,20 +110,7 @@ class OptionsModal {
               ),
               const SizedBox(height: 20),
 
-              // ✅ TARJETA QUE SE PUEDE TOCAR EN CUALQUIER LADO
-              _buildTarjetaEmpresaSeleccionadaInteractiva(
-                context: context,
-                empresa: empresa,
-                userData: userData,
-                empresaSeleccionada: empresaSeleccionada,
-                onCambiarEmpresa: onCambiarEmpresa,
-                onReiniciarApp: onReiniciarApp,
-                onActualizarVista: onActualizarVista,
-              ),
-
-              const SizedBox(height: 16),
-
-              // ✅ BOTÓN PARA NUEVA EMPRESA (REDIRIGE A PANTALLA COMPLETA)
+              // ✅ BOTÓN PARA NUEVA EMPRESA
               _buildOptionItem(
                 icon: Icons.add_business,
                 title: 'Agregar nueva empresa',
@@ -143,7 +125,7 @@ class OptionsModal {
                 const SizedBox(height: 16),
                 _buildOptionItem(
                   icon: Icons.people,
-                  title: 'Ver autorizadores',
+                  title: 'Agregar autorizadores',
                   subtitle: 'Lista de personas autorizadas',
                   onTap: () {
                     Navigator.pop(context);
@@ -199,7 +181,7 @@ class OptionsModal {
   static Widget crearVistaNuevaEmpresa({
     required BuildContext context,
     required Map<String, dynamic> userData,
-    required Function(String, String, String) onAgregarEmpresa, // Ahora incluye pin
+    required Function(String, String, String) onAgregarEmpresa,
     required VoidCallback onVolver,
     required VoidCallback onReiniciarApp,
     required VoidCallback onActualizarDashboard,
@@ -220,7 +202,6 @@ class OptionsModal {
       String? empresaSeleccionada,
       ) {
     if (empresaSeleccionada == null) return null;
-
     final empresas = userData['empresas'] ?? [];
     return empresas.firstWhere(
           (emp) => emp['token_empresa'] == empresaSeleccionada,
@@ -230,125 +211,10 @@ class OptionsModal {
 
   static bool _esRepresentanteValido(Map<String, dynamic>? empresa) {
     if (empresa == null || empresa.isEmpty) return false;
-
     final tipoRelacion = empresa['tipo_relacion']?.toString().toLowerCase() ?? '';
     final validezRelacion = empresa['validez_relacion']?.toString().toLowerCase() ?? '';
-
     return tipoRelacion.contains('representante') &&
         !validezRelacion.contains('no válida');
-  }
-
-  // ✅ TARJETA INTERACTIVA QUE SE PUEDE TOCAR EN CUALQUIER LADO
-  static Widget _buildTarjetaEmpresaSeleccionadaInteractiva({
-    required BuildContext context,
-    required Map<String, dynamic>? empresa,
-    required Map<String, dynamic> userData,
-    required String? empresaSeleccionada,
-    required Function(String) onCambiarEmpresa,
-    required VoidCallback onReiniciarApp,
-    required VoidCallback onActualizarVista,
-  }) {
-    String nombreEmpresa = 'No hay empresa seleccionada';
-    String rutEmpresa = '';
-
-    if (empresa != null && empresa.isNotEmpty) {
-      final rut = empresa['rut_empresa']?.toString() ?? '';
-      final dv = empresa['dv_rut_empresa']?.toString() ?? '';
-      nombreEmpresa = empresa['nombre_empresa']?.toString() ?? 'Empresa ${rut}-$dv';
-
-      final rutCompleto = '$rut-$dv';
-      rutEmpresa = _formatRut(rutCompleto);
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
-          child: Text(
-            'Empresa seleccionada',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
-          ),
-        ),
-        InkWell(
-          onTap: () {
-            Navigator.of(context, rootNavigator: true).pop();
-            Future.delayed(const Duration(milliseconds: 50), () {
-              _mostrarSelectorEmpresas(
-                context: context,
-                userData: userData,
-                empresaSeleccionada: empresaSeleccionada,
-                onCambiarEmpresa: onCambiarEmpresa,
-                onReiniciarApp: onReiniciarApp,
-                onActualizarVista: onActualizarVista,
-              );
-            });
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _approvedCardBackground,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _blueDarkColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.business,
-                    color: _blueDarkColor,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        nombreEmpresa,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (rutEmpresa.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'RUT: $rutEmpresa',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.swap_horiz,
-                  color: _blueDarkColor,
-                  size: 24,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
   }
 
   static Widget _buildOptionItem({
@@ -392,116 +258,12 @@ class OptionsModal {
     );
   }
 
-  static void _mostrarSelectorEmpresas({
-    required BuildContext context,
-    required Map<String, dynamic> userData,
-    required String? empresaSeleccionada,
-    required Function(String) onCambiarEmpresa,
-    required VoidCallback onReiniciarApp,
-    required VoidCallback onActualizarVista,
-  }) {
-    final empresas = userData['empresas'] ?? [];
-
-    if (empresas.isEmpty) {
-      mostrarSnackBar(context, 'No hay empresas disponibles');
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      useRootNavigator: true,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Seleccionar Empresa',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _blueDarkColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: empresas.length,
-                  itemBuilder: (context, index) {
-                    final empresa = empresas[index];
-                    final rut = empresa['rut_empresa']?.toString() ?? '';
-                    final dv = empresa['dv_rut_empresa']?.toString() ?? '';
-                    final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? 'Empresa ${rut}-$dv';
-                    final bool isSelected = empresa['token_empresa'] == empresaSeleccionada;
-
-                    final rutFormateado = _formatRut('$rut-$dv');
-
-                    return ListTile(
-                      leading: Icon(
-                        Icons.business,
-                        color: isSelected ? _blueDarkColor : Colors.grey,
-                      ),
-                      title: Text(
-                        nombreEmpresa,
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? _blueDarkColor : Colors.black,
-                        ),
-                      ),
-                      subtitle: Text('RUT: $rutFormateado'),
-                      trailing: isSelected
-                          ? Icon(Icons.check, color: _blueDarkColor)
-                          : null,
-                      onTap: () {
-                        final nuevaEmpresaSeleccionada = empresa['token_empresa'];
-                        Navigator.of(context, rootNavigator: true).pop();
-
-                        // ✅ SIMPLEMENTE CAMBIAR LA EMPRESA SIN RECARGAR TODO
-                        onCambiarEmpresa(nuevaEmpresaSeleccionada);
-
-                        // ✅ MOSTRAR MENSAJE SIMPLE
-                        mostrarSnackBar(context, 'Cambiada a: $nombreEmpresa');
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _blueDarkColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text('Cerrar'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // Métodos auxiliares para RUT
+  // Métodos auxiliares para RUT (usados en otras pantallas)
   static String _formatRut(String rut) {
     String cleanRut = rut.replaceAll('.', '').replaceAll('-', '');
-
     if (cleanRut.length < 2) return rut;
-
     String numero = cleanRut.substring(0, cleanRut.length - 1);
     String dv = cleanRut.substring(cleanRut.length - 1);
-
     String formatted = '';
     for (int i = numero.length - 1, j = 0; i >= 0; i--, j++) {
       if (j > 0 && j % 3 == 0) {
@@ -509,30 +271,20 @@ class OptionsModal {
       }
       formatted = numero[i] + formatted;
     }
-
     return '$formatted-$dv'.toUpperCase();
   }
 
   static bool _validateRut(String rut) {
     if (rut.isEmpty) return false;
-
     try {
       String cleanRut = rut.replaceAll('.', '').replaceAll('-', '').toUpperCase();
-
       if (cleanRut.length < 8) return false;
-
       String numero = cleanRut.substring(0, cleanRut.length - 1);
       String dv = cleanRut.substring(cleanRut.length - 1);
-
       if (numero.length < 7) return false;
-
       if (int.tryParse(numero) == null) return false;
-
       int rutNumerico = int.parse(numero);
-      if (rutNumerico < 1000000) {
-        return false;
-      }
-
+      if (rutNumerico < 1000000) return false;
       String expectedDv = _calculateDv(numero);
       return dv == expectedDv;
     } catch (e) {
@@ -543,15 +295,12 @@ class OptionsModal {
   static String _calculateDv(String numero) {
     int suma = 0;
     int multiplicador = 2;
-
     for (int i = numero.length - 1; i >= 0; i--) {
       suma += int.parse(numero[i]) * multiplicador;
       multiplicador = multiplicador == 7 ? 2 : multiplicador + 1;
     }
-
     int resto = suma % 11;
     String dv = (11 - resto).toString();
-
     if (dv == '11') return '0';
     if (dv == '10') return 'K';
     return dv;
@@ -560,10 +309,8 @@ class OptionsModal {
   static Map<String, String> _parseRut(String rut) {
     String cleanRut = rut.replaceAll('.', '').replaceAll('-', '').toUpperCase();
     if (cleanRut.length < 2) return {'numero': '', 'dv': ''};
-
     String numero = cleanRut.substring(0, cleanRut.length - 1);
     String dv = cleanRut.substring(cleanRut.length - 1);
-
     return {'numero': numero, 'dv': dv};
   }
 
@@ -574,23 +321,14 @@ class OptionsModal {
       ) {
     try {
       final empresas = userData['empresas'] ?? [];
-
       for (final empresa in empresas) {
         final rutExistente = empresa['rut_empresa']?.toString() ?? '';
         final dvExistente = empresa['dv_rut_empresa']?.toString() ?? '';
-
-        if (rutExistente == rutEmpresa && dvExistente == dvEmpresa) {
-          return true;
-        }
-
+        if (rutExistente == rutEmpresa && dvExistente == dvEmpresa) return true;
         final rutCompletoExistente = '$rutExistente-$dvExistente';
         final rutCompletoIngresado = '$rutEmpresa-$dvEmpresa';
-
-        if (_formatRut(rutCompletoExistente) == _formatRut(rutCompletoIngresado)) {
-          return true;
-        }
+        if (_formatRut(rutCompletoExistente) == _formatRut(rutCompletoIngresado)) return true;
       }
-
       return false;
     } catch (e) {
       return false;
@@ -602,7 +340,7 @@ class OptionsModal {
 class _NuevaEmpresaScreen extends StatefulWidget {
   final BuildContext context;
   final Map<String, dynamic> userData;
-  final Function(String, String, String) onAgregarEmpresa; // Ahora recibe pin
+  final Function(String, String, String) onAgregarEmpresa;
   final VoidCallback onVolver;
   final VoidCallback onReiniciarApp;
   final VoidCallback onActualizarDashboard;
@@ -622,14 +360,14 @@ class _NuevaEmpresaScreen extends StatefulWidget {
 
 class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
   final TextEditingController _rutController = TextEditingController();
-  final TextEditingController _pinController = TextEditingController(); // Nuevo controlador para el pin
-  bool _obscurePin = true; // Para mostrar/ocultar el pin
+  final TextEditingController _pinController = TextEditingController();
+  bool _obscurePin = true;
   String? _tipoRelacionSeleccionada;
   bool _isLoading = false;
   bool _rutValido = false;
-  bool _pinValido = false; // Nueva validación para el pin
+  bool _pinValido = false;
   String _mensajeValidacionRut = '';
-  String _mensajeValidacionPin = ''; // Mensaje para el pin
+  String _mensajeValidacionPin = '';
 
   @override
   Widget build(BuildContext context) {
@@ -662,29 +400,17 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ✅ FORMULARIO DE RUT
           _buildRutForm(),
-
           const SizedBox(height: 24),
-
-          // ✅ SELECTOR DE TIPO DE RELACIÓN
           _buildSelectorTipoRelacion(),
-
           if (_tipoRelacionSeleccionada != null) ...[
             const SizedBox(height: 16),
             _buildInfoTipoRelacion(_tipoRelacionSeleccionada!),
           ],
-
           const SizedBox(height: 24),
-
-          // ✅ NUEVO CAMPO DE PIN DE SEGURIDAD
           _buildPinField(),
-
           const SizedBox(height: 32),
-
-          // ✅ BOTÓN DE AGREGAR (ahora validando también el pin)
           _buildBotonAgregar(),
-
           const SizedBox(height: 40),
         ],
       ),
@@ -728,20 +454,16 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
                 selection: TextSelection.collapsed(offset: formattedRut.length),
               );
             }
-
             final valido = OptionsModal._validateRut(formattedRut);
             String mensajeDuplicado = '';
-
             if (valido) {
               final rutParseado = OptionsModal._parseRut(formattedRut);
               final rutEmpresa = rutParseado['numero'] ?? '';
               final dvEmpresa = rutParseado['dv'] ?? '';
-
               if (OptionsModal._rutEmpresaYaExiste(widget.userData, rutEmpresa, dvEmpresa)) {
                 mensajeDuplicado = 'Esta empresa ya está registrada';
               }
             }
-
             setState(() {
               _rutValido = valido && mensajeDuplicado.isEmpty;
               _mensajeValidacionRut = mensajeDuplicado.isNotEmpty
@@ -750,7 +472,6 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
             });
           },
         ),
-
         if (_mensajeValidacionRut.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
@@ -1013,9 +734,7 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
         'permisos': '• Todas las funciones de autorizador\n• Gestionar autorizadores',
       },
     };
-
     final info = infoTipos[tipoRelacion]!;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -1075,7 +794,6 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
     );
   }
 
-  // ✅ NUEVO: Campo de pin de seguridad con estilos globales
   Widget _buildPinField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1135,10 +853,8 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
   }
 
   void _validarPin(String value) {
-    // Validación: solo números y al menos 4 dígitos
     final esNumerico = RegExp(r'^[0-9]+$').hasMatch(value);
     final longitudValida = value.length >= 4;
-
     setState(() {
       _pinValido = esNumerico && longitudValida;
       _mensajeValidacionPin = _pinValido
@@ -1158,32 +874,18 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
       child: ElevatedButton(
         onPressed: (_rutValido && _tipoRelacionSeleccionada != null && _pinValido && !_isLoading)
             ? () async {
-          setState(() {
-            _isLoading = true;
-          });
-
+          setState(() => _isLoading = true);
           try {
             final rut = _rutController.text.trim();
             final tipoRelacion = _tipoRelacionSeleccionada!;
-            final pin = _pinController.text.trim(); // Obtener el pin
-
-            // ✅ LLAMAR AL MÉTODO DEL DASHBOARD CON EL PIN
+            final pin = _pinController.text.trim();
             await widget.onAgregarEmpresa(rut, tipoRelacion, pin);
-
-            // ✅ ACTUALIZAR EL DASHBOARD
             widget.onActualizarDashboard();
-
-            // ✅ VOLVER ATRÁS
             widget.onVolver();
-
           } catch (e) {
             mostrarSnackBar(widget.context, 'Error: $e');
           } finally {
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
-            }
+            if (mounted) setState(() => _isLoading = false);
           }
         }
             : null,
@@ -1259,17 +961,14 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         _initializingToken = true;
         _errorCarga = false;
       });
-
       print('🔄 Inicializando token FCM...');
       await _initializeDeviceToken();
-
       int attempts = 0;
       while (_deviceToken == null && attempts < 5) {
         print('⏳ Esperando token FCM... Intento ${attempts + 1}');
         await Future.delayed(const Duration(milliseconds: 500));
         attempts++;
       }
-
       if (_deviceToken == null) {
         print('⚠️ No se pudo obtener token FCM después de 5 intentos');
         setState(() {
@@ -1278,10 +977,8 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         });
         return;
       }
-
       print('✅ Token FCM obtenido exitosamente');
       await _cargarAutorizadores();
-
     } catch (e) {
       print('❌ Error inicializando token y datos: $e');
       setState(() {
@@ -1289,11 +986,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         _initializingToken = false;
       });
     } finally {
-      if (mounted) {
-        setState(() {
-          _initializingToken = false;
-        });
-      }
+      if (mounted) setState(() => _initializingToken = false);
     }
   }
 
@@ -1301,93 +994,68 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     try {
       print('🔄 Inicializando Firebase...');
       await Firebase.initializeApp();
-
       print('🔄 Obteniendo token FCM...');
       String? fcmToken = await FirebaseMessaging.instance.getToken();
-
       if (fcmToken != null) {
         print('✅ Token FCM obtenido exitosamente');
-        setState(() {
-          _deviceToken = fcmToken;
-        });
+        setState(() => _deviceToken = fcmToken);
       } else {
         print('⚠️ Token FCM es null, usando fallback');
         await Future.delayed(const Duration(seconds: 1));
         fcmToken = await FirebaseMessaging.instance.getToken();
-
         if (fcmToken != null) {
           print('✅ Token FCM obtenido en segundo intento');
-          setState(() {
-            _deviceToken = fcmToken;
-          });
+          setState(() => _deviceToken = fcmToken);
         } else {
           print('⚠️ No se pudo obtener token FCM, creando fallback');
           final String fallbackToken = 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
-          setState(() {
-            _deviceToken = fallbackToken;
-          });
+          setState(() => _deviceToken = fallbackToken);
         }
       }
     } catch (e) {
       print('❌ Error obteniendo token FCM: $e');
       final String errorToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
-      setState(() {
-        _deviceToken = errorToken;
-      });
+      setState(() => _deviceToken = errorToken);
     }
   }
 
   Future<void> _cargarAutorizadores() async {
     print('🔄 Cargando autorizadores...');
-
     if (!mounted) {
       print('⚠️ Widget no está montado, cancelando carga');
       return;
     }
-
     setState(() {
       _isLoading = true;
       _errorCarga = false;
     });
-
     try {
       if (_deviceToken == null) {
         print('⚠️ Token del dispositivo es null, obteniendo uno nuevo...');
         await _initializeDeviceToken();
-
         if (_deviceToken == null) {
           mostrarSnackBar(context, 'No se pudo obtener el token del dispositivo');
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _errorCarga = true;
-            });
-          }
+          if (mounted) setState(() {
+            _isLoading = false;
+            _errorCarga = true;
+          });
           return;
         }
       }
-
       final tokenRepresentante = widget.userData['comprador']?['token_comprador'] ?? '';
       final empresa = _getEmpresaSeleccionada();
       final tokenEmpresa = empresa?['token_empresa'] ?? '';
-
       if (tokenRepresentante.isEmpty || tokenEmpresa.isEmpty) {
         mostrarSnackBar(context, 'No se pudo obtener la información necesaria');
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
-
       final String apiUrl = '${GlobalVariables.baseUrl}/ListarAutorizadores/api/v2/';
       final requestBody = {
         'token_representante': tokenRepresentante,
         'token_empresa': tokenEmpresa,
         'token_dispositivo': _deviceToken!,
       };
-
       print('📡 Enviando request a la API...');
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -1397,21 +1065,16 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         },
         body: jsonEncode(requestBody),
       ).timeout(const Duration(seconds: 10));
-
       print('📡 Response recibido: Status ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
         if (data['success'] == false && data['sesion_iniciada'] == false) {
           mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
           reiniciarAplicacion(context);
           return;
         }
-
         final lista = data['autorizadores_designados'] ?? [];
         print('✅ Autorizadores cargados: ${lista.length}');
-
         if (mounted) {
           setState(() {
             _autorizadores = List<Map<String, dynamic>>.from(lista);
@@ -1427,61 +1090,46 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       } else {
         print('❌ Error en API: ${response.statusCode}');
         mostrarSnackBar(context, 'Error al cargar autorizadores');
-        if (mounted) {
-          setState(() {
-            _errorCarga = true;
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      print('❌ Excepción en _cargarAutorizadores: $e');
-      mostrarSnackBar(context, 'Error de conexión');
-      if (mounted) {
-        setState(() {
+        if (mounted) setState(() {
           _errorCarga = true;
           _isLoading = false;
         });
       }
+    } catch (e) {
+      print('❌ Excepción en _cargarAutorizadores: $e');
+      mostrarSnackBar(context, 'Error de conexión');
+      if (mounted) setState(() {
+        _errorCarga = true;
+        _isLoading = false;
+      });
     }
   }
 
   void _recargarLista() {
     print('🔄 Recargando lista de autorizadores...');
     if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
+      setState(() => _isLoading = true);
       _cargarAutorizadores();
     }
   }
 
-  // ✅ ELIMINAR AUTORIZADOR (AHORA CON PIN Y API V3)
   Future<void> _eliminarAutorizador(Map<String, dynamic> autorizador, String pin) async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       print('🔄 Obteniendo token del dispositivo...');
       final String deviceToken = await FCMTokenManager.getDeviceToken();
-
       final tokenRepresentante = widget.userData['comprador']?['token_comprador'] ?? '';
       final empresa = _getEmpresaSeleccionada();
       final rutEmpresa = empresa?['rut_empresa']?.toString() ?? '';
       final dvRutEmpresa = empresa?['dv_rut_empresa']?.toString() ?? '';
-
       final runComprador = autorizador['run_comprador']?.toString() ?? '';
       final dvRunComprador = autorizador['dv_run_comprador']?.toString() ?? '';
-
       if (tokenRepresentante.isEmpty || runComprador.isEmpty || dvRunComprador.isEmpty ||
           rutEmpresa.isEmpty || dvRutEmpresa.isEmpty) {
         print('❌ Faltan datos para eliminar el autorizador');
         mostrarSnackBar(context, 'Faltan datos para eliminar el autorizador');
         return;
       }
-
-      // ✅ CAMBIO: URL v3 y campo pin_seguridad
       final String apiUrl = '${GlobalVariables.baseUrl}/CambiarValidezCompradorDesignado/api/v3/';
       final requestBody = {
         'token_representante': tokenRepresentante,
@@ -1490,9 +1138,8 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         'rut_empresa_autorizador': rutEmpresa,
         'dv_rut_empresa_autorizador': dvRutEmpresa,
         'token_dispositivo': deviceToken,
-        'pin_seguridad': pin, // ← NUEVO CAMPO
+        'pin_seguridad': pin,
       };
-
       print('📡 Enviando request para eliminar autorizador...');
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -1502,18 +1149,14 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         },
         body: jsonEncode(requestBody),
       );
-
       print('📡 Response recibido: Status ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
         if (data['success'] == false && data['sesion_iniciada'] == false) {
           mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
           reiniciarAplicacion(context);
           return;
         }
-
         final mensaje = data['message'] ?? data['mensaje'] ?? 'Autorizador eliminado correctamente';
         print('✅ ÉXITO: $mensaje');
         mostrarSnackBar(context, mensaje);
@@ -1533,20 +1176,15 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       print('❌ EXCEPCIÓN: Error en _eliminarAutorizador: $e');
       mostrarSnackBar(context, 'Error de conexión: $e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _mostrarDialogoAgregarAutorizador() {
     print('🔍 Abriendo diálogo para agregar autorizador');
-    _mostrarDialogoNuevoAutorizadorConPin(); // ← LLAMA A LA NUEVA VERSIÓN CON PIN
+    _mostrarDialogoNuevoAutorizadorConPin();
   }
 
-  // ✅ NUEVO DIÁLOGO PARA AGREGAR AUTORIZADOR CON CAMPO DE PIN
   void _mostrarDialogoNuevoAutorizadorConPin() {
     final TextEditingController runController = TextEditingController();
     final TextEditingController pinController = TextEditingController();
@@ -1555,7 +1193,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     bool obscurePin = true;
     String mensajeValidacionRun = '';
     String mensajeValidacionPin = '';
-
     showDialog(
       context: context,
       useRootNavigator: true,
@@ -1582,7 +1219,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       // Campo RUN
                       Text(
                         'RUN',
@@ -1617,9 +1253,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                               selection: TextSelection.collapsed(offset: formattedRun.length),
                             );
                           }
-
                           final valido = OptionsModal._validateRut(formattedRun);
-
                           if (valido) {
                             final comprador = widget.userData['comprador'];
                             if (comprador != null) {
@@ -1627,7 +1261,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                               final dvComprador = comprador['dv_run_comprador']?.toString() ?? '';
                               final runCompletoComprador = '$runComprador-$dvComprador';
                               final runFormateadoComprador = OptionsModal._formatRut(runCompletoComprador);
-
                               if (formattedRun == runFormateadoComprador) {
                                 setState(() {
                                   runValido = false;
@@ -1636,28 +1269,23 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                                 return;
                               }
                             }
-
                             final runParseado = OptionsModal._parseRut(formattedRun);
                             final runNumero = runParseado['numero'] ?? '';
                             final runDv = runParseado['dv'] ?? '';
-
                             bool yaRegistrado = false;
                             for (var autorizador in _autorizadores) {
                               final runExistente = autorizador['run_comprador']?.toString() ?? '';
                               final dvExistente = autorizador['dv_run_comprador']?.toString() ?? '';
-
                               if (runExistente == runNumero && dvExistente == runDv) {
                                 yaRegistrado = true;
                                 break;
                               }
-
                               final runCompletoExistente = '$runExistente-$dvExistente';
                               if (OptionsModal._formatRut(runCompletoExistente) == formattedRun) {
                                 yaRegistrado = true;
                                 break;
                               }
                             }
-
                             if (yaRegistrado) {
                               setState(() {
                                 runValido = false;
@@ -1666,7 +1294,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                               return;
                             }
                           }
-
                           setState(() {
                             runValido = valido;
                             mensajeValidacionRun = valido ? 'RUN válido y disponible' : 'RUN inválido';
@@ -1684,10 +1311,8 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                           ),
                         ),
                       ],
-
                       const SizedBox(height: 16),
-
-                      // Campo PIN (nuevo)
+                      // Campo PIN
                       Text(
                         'Pin de seguridad',
                         style: TextStyle(
@@ -1719,7 +1344,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                         ),
                         onChanged: (value) {
                           final esNumerico = RegExp(r'^[0-9]+$').hasMatch(value);
-                          final longitudValida = value.length == 4; // Exactamente 4 dígitos
+                          final longitudValida = value.length == 4;
                           setState(() {
                             pinValido = esNumerico && longitudValida;
                             mensajeValidacionPin = pinValido
@@ -1743,9 +1368,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                           ),
                         ),
                       ],
-
                       const SizedBox(height: 24),
-
                       // Botones
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -1768,16 +1391,14 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                               final run = runController.text.trim();
                               final pin = pinController.text.trim();
                               print('✅ Confirmado: Agregando autorizador con RUN: $run y PIN: $pin');
-
                               final BuildContext dialogContext = context;
                               Navigator.of(dialogContext, rootNavigator: true).pop();
-
                               try {
                                 await _asignarAutorizadorApi(
                                   context: dialogContext,
                                   userData: widget.userData,
                                   run: run,
-                                  pin: pin, // ← NUEVO PARÁMETRO
+                                  pin: pin,
                                   onAsignarAutorizador: widget.onAsignarAutorizador,
                                   onReiniciarApp: widget.onReiniciarApp,
                                   onActualizarAutorizadores: widget.onActualizarAutorizadores,
@@ -1809,18 +1430,15 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     );
   }
 
-  // ✅ DIÁLOGO PARA ELIMINAR AUTORIZADOR CON CAMPO DE PIN
   void _mostrarDialogoEliminarAutorizador(Map<String, dynamic> autorizador) {
     final nombre = autorizador['nombre_comprador'] ?? 'Sin nombre';
     final runComprador = autorizador['run_comprador']?.toString() ?? '';
     final dvRunComprador = autorizador['dv_run_comprador']?.toString() ?? '';
     final runFormateado = OptionsModal._formatRut('$runComprador-$dvRunComprador');
-
     final TextEditingController pinController = TextEditingController();
     bool pinValido = false;
     bool obscurePin = true;
     String mensajeValidacionPin = '';
-
     showDialog(
       context: context,
       useRootNavigator: true,
@@ -1855,8 +1473,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // Campo PIN para confirmar eliminación
+                    // Campo PIN
                     Text(
                       'Ingresa tu pin de seguridad',
                       style: TextStyle(
@@ -1912,7 +1529,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                         ),
                       ),
                     ],
-
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -1964,7 +1580,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
 
   Map<String, dynamic>? _getEmpresaSeleccionada() {
     if (widget.empresaSeleccionada == null) return null;
-
     final empresas = widget.userData['empresas'] ?? [];
     return empresas.firstWhere(
           (emp) => emp['token_empresa'] == widget.empresaSeleccionada,
@@ -1974,26 +1589,19 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
 
   bool _esRepresentanteValido(Map<String, dynamic>? empresa) {
     if (empresa == null || empresa.isEmpty) return false;
-
     final tipoRelacion = empresa['tipo_relacion']?.toString().toLowerCase() ?? '';
     final validezRelacion = empresa['validez_relacion']?.toString().toLowerCase() ?? '';
-
     return tipoRelacion.contains('representante') &&
         !validezRelacion.contains('no válida');
   }
 
   Widget _buildTituloEmpresa() {
     final empresa = _getEmpresaSeleccionada();
-
-    if (empresa == null || empresa.isEmpty) {
-      return Container();
-    }
-
+    if (empresa == null || empresa.isEmpty) return Container();
     final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? 'Empresa';
     final rut = empresa['rut_empresa']?.toString() ?? '';
     final dv = empresa['dv_rut_empresa']?.toString() ?? '';
     final rutFormateado = OptionsModal._formatRut('$rut-$dv');
-
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -2067,9 +1675,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     final runComprador = autorizador['run_comprador']?.toString() ?? '';
     final dvRunComprador = autorizador['dv_run_comprador']?.toString() ?? '';
     final runCompleto = '$runComprador-$dvRunComprador';
-
     final verificado = autorizador['verificado'] ?? false;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -2113,7 +1719,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2159,7 +1764,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                   ],
                 ),
               ),
-
               Container(
                 width: 36,
                 height: 36,
@@ -2171,7 +1775,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                   icon: Icon(Icons.close, color: Colors.red, size: 18),
                   onPressed: () {
                     print('❌ Eliminando autorizador: $nombre');
-                    _mostrarDialogoEliminarAutorizador(autorizador); // ← AHORA USA EL NUEVO DIÁLOGO CON PIN
+                    _mostrarDialogoEliminarAutorizador(autorizador);
                   },
                   padding: EdgeInsets.zero,
                   splashRadius: 20,
@@ -2222,7 +1826,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
   Widget build(BuildContext context) {
     final empresa = _getEmpresaSeleccionada();
     final bool esRepresentanteValido = _esRepresentanteValido(empresa);
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -2292,7 +1895,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
           : Column(
         children: [
           _buildTituloEmpresa(),
-
           if (!esRepresentanteValido)
             Container(
               padding: const EdgeInsets.all(20),
@@ -2315,7 +1917,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                 ],
               ),
             ),
-
           Expanded(
             child: _autorizadores.isEmpty
                 ? _buildEstadoVacio()
@@ -2343,12 +1944,11 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     );
   }
 
-  // ✅ ASIGNAR AUTORIZADOR (AHORA CON PIN Y API V3)
   Future<void> _asignarAutorizadorApi({
     required BuildContext context,
     required Map<String, dynamic> userData,
     required String run,
-    required String pin, // ← NUEVO PARÁMETRO
+    required String pin,
     required Function(String) onAsignarAutorizador,
     required VoidCallback onReiniciarApp,
     required VoidCallback onActualizarAutorizadores,
@@ -2356,44 +1956,34 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     print('══════════════════════════════════════════════════════════════');
     print('🎯 INICIANDO API _asignarAutorizadorApi (v3)');
     print('══════════════════════════════════════════════════════════════');
-
     try {
       print('🔄 Obteniendo token del dispositivo...');
       final String deviceToken = await FCMTokenManager.getDeviceToken();
-
       final tokenComprador = userData['comprador']?['token_comprador'] ?? '';
       final runComprador = userData['comprador']?['run_comprador']?.toString() ?? '';
       final dvRunComprador = userData['comprador']?['dv_run_comprador']?.toString() ?? '';
-
       if (tokenComprador.isEmpty || runComprador.isEmpty || dvRunComprador.isEmpty) {
         print('❌ Faltan datos del comprador');
         return;
       }
-
       final empresas = userData['empresas'] ?? [];
       final empresaSeleccionada = empresas.firstWhere(
             (emp) => emp['seleccionada'] == true,
         orElse: () => empresas.isNotEmpty ? empresas[0] : {},
       );
-
       if (empresaSeleccionada.isEmpty) {
         print('❌ No hay empresa seleccionada');
         return;
       }
-
       final rutEmpresa = empresaSeleccionada['rut_empresa']?.toString() ?? '';
       final dvEmpresa = empresaSeleccionada['dv_rut_empresa']?.toString() ?? '';
-
       final runParseado = OptionsModal._parseRut(run);
       final runAutorizador = runParseado['numero'] ?? '';
       final dvRunAutorizador = runParseado['dv'] ?? '';
-
       if (runAutorizador.isEmpty || dvRunAutorizador.isEmpty) {
         print('❌ RUN inválido');
         return;
       }
-
-      // ✅ CAMBIO: URL v3 y campo pin_seguridad
       final requestBody = {
         "token_representante": tokenComprador,
         "run_autorizador": runAutorizador,
@@ -2401,13 +1991,12 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         "rut_empresa": rutEmpresa,
         "dv_empresa": dvEmpresa,
         "token_dispositivo": deviceToken,
-        "pin_seguridad": pin, // ← NUEVO CAMPO
+        "pin_seguridad": pin,
       };
-
       print('📡 Enviando request a la API...');
       print('Request: $requestBody');
       final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/CrearAutorizador/api/v3/'), // ← v3
+        Uri.parse('${GlobalVariables.baseUrl}/CrearAutorizador/api/v3/'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -2415,23 +2004,17 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         },
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 15));
-
       print('📡 Response recibido: Status ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-
         if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
           print('🔐 Sesión expirada');
           return;
         }
-
         if (responseData['success'] == true) {
           final mensaje = responseData['message'] ?? 'Autorizador asignado exitosamente';
           print('✅ ÉXITO: $mensaje');
-
           onAsignarAutorizador(run);
-
           if (onActualizarAutorizadores != null) {
             print('🔄 Ejecutando onActualizarAutorizadores...');
             onActualizarAutorizadores();

@@ -9,6 +9,7 @@ import 'eliminar_cuenta_screen.dart';
 import 'pin_creation_screen.dart';
 import 'variables_globales.dart';
 import 'editar_campo_screen.dart';
+import 'options_modal.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -369,11 +370,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  bool _esRepresentanteValido() {
+    final empresa = _getEmpresaData();
+    if (empresa == null || empresa.isEmpty) return false;
+    final tipoRelacion = empresa['tipo_relacion']?.toString().toLowerCase() ?? '';
+    final validezRelacion = empresa['validez_relacion']?.toString().toLowerCase() ?? '';
+    return tipoRelacion.contains('representante') && !validezRelacion.contains('no válida');
+  }
+
+  void _navegarAAutorizadores() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OptionsModal.crearVistaAutorizadores(
+          context: context,
+          userData: widget.userData,
+          empresaSeleccionada: widget.empresaSeleccionada,
+          onAsignarAutorizador: (run) {},
+          onActualizarAutorizadores: () {
+            if (widget.onRefresh != null) widget.onRefresh!();
+          },
+          onVolver: () => Navigator.pop(context),
+          onReiniciarApp: () {
+            Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildContent() {
     final empresaData = _getEmpresaData();
     final bool esRelacionValida = _esRelacionValida();
     final int userStatus = _getUserStatus();
     final bool mostrarInfoVerificada = userStatus >= 3;
+    final bool mostrarSeccionEmpresa = mostrarInfoVerificada && empresaData != null;
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -396,8 +427,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-          // Sección Información de empresa (colapsable)
-          if (mostrarInfoVerificada && empresaData != null) ...[
+          // ---------- SECCIÓN EMPRESA (condicional) ----------
+          if (mostrarSeccionEmpresa) ...[
             _buildSectionHeader(
               title: 'Información de empresa',
               subtitle: 'Datos de la empresa seleccionada',
@@ -406,6 +437,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             if (_empresaExpanded) ...[
               const SizedBox(height: 8),
+              // Tarjeta de información de la empresa
               _buildInfoCard(
                 children: [
                   if (esRelacionValida) ...[
@@ -427,13 +459,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildRelacionItem(esValida: esRelacionValida, color: _blueDarkColor),
                 ],
               ),
+              // Tarjeta independiente para "Ver autorizadores" (solo si es representante válido)
+              if (_esRepresentanteValido()) ...[
+                const SizedBox(height: 16),
+                _buildSecurityCard(
+                  icon: Icons.people,
+                  title: 'Ver autorizadores',
+                  subtitle: 'Gestionar a los autorizadores designados',
+                  onTap: _navegarAAutorizadores,
+                ),
+              ],
               const SizedBox(height: 30),
             ] else
               const SizedBox(height: 30),
+
+            // Divisor solo si hay sección de empresa
+            const Divider(color: Colors.grey, thickness: 1),
+            const SizedBox(height: 20),
+          ] else ...[
+            const SizedBox(height: 20),
           ],
-          const Divider(color: Colors.grey, thickness: 1),
-          const SizedBox(height: 20),
-          // Sección Información personal (colapsable)
+
+          // ---------- SECCIÓN INFORMACIÓN PERSONAL ----------
           _buildSectionHeader(
             title: 'Información personal',
             subtitle: 'Datos de tu cuenta',
@@ -478,7 +525,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   label: 'Email',
                   value: _getUserEmail(),
                   color: _blueDarkColor,
-                  // trailing: IconButton(...) // Comentado
                 ),
                 const SizedBox(height: 16),
                 _buildInfoItemConIcono(
@@ -507,7 +553,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(color: Colors.grey, thickness: 1),
           const SizedBox(height: 20),
 
-          // Sección Seguridad (colapsable)
+          // ---------- SECCIÓN SEGURIDAD ----------
           _buildSectionHeader(
             title: 'Seguridad',
             subtitle: 'Opciones de seguridad de tu cuenta',
@@ -613,6 +659,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Divider(color: Colors.grey, thickness: 1),
           const SizedBox(height: 20),
 
+          // Botón de cierre de sesión
           SizedBox(
             width: double.infinity,
             height: 50,

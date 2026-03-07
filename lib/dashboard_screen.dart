@@ -388,7 +388,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         builder: (context) => OptionsModal.crearVistaNuevaEmpresa(
           context: context,
           userData: _currentUserData,
-          onAgregarEmpresa: (rut, tipoRelacion, pin) {   // ← AHORA RECIBE 3 PARÁMETROS
+          onAgregarEmpresa: (rut, tipoRelacion, pin) {
             print('📤 Empresa agregada desde pantalla: $rut - $tipoRelacion - PIN: $pin');
             _agregarEmpresaNuevoEnfoque(rut, tipoRelacion, pin);
           },
@@ -455,7 +455,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
         final representanteOautorizador = tipoRelacion.toLowerCase() == 'autorizador' ? '1' : '2';
 
-        // ✅ AGREGAR EL PIN AL REQUEST BODY
         final requestBody = {
           "token_comprador": tokenComprador,
           "run_comprador": runComprador,
@@ -546,6 +545,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       if (mounted) setState(() {});
     }
   }
+
   void _seleccionarYRedirigirEmpresa(String rut) {
     print('🎯 Buscando y seleccionando empresa: $rut');
     final rutParseado = RutUtils.parseRut(rut);
@@ -961,6 +961,97 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }
   }
 
+  // 🆕 Método para mostrar selector de empresas
+  void _mostrarSelectorEmpresas() {
+    final empresas = _currentUserData['empresas'] ?? [];
+    if (empresas.isEmpty) {
+      mostrarSnackBarGlobal(context, 'No hay empresas disponibles');
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      useRootNavigator: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Seleccionar Empresa',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _blueDarkColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: empresas.length,
+                  itemBuilder: (context, index) {
+                    final empresa = empresas[index];
+                    final rut = empresa['rut_empresa']?.toString() ?? '';
+                    final dv = empresa['dv_rut_empresa']?.toString() ?? '';
+                    final nombreEmpresa = empresa['nombre_empresa']?.toString() ?? 'Empresa ${rut}-$dv';
+                    final bool isSelected = empresa['token_empresa'] == _empresaSeleccionada;
+
+                    final rutFormateado = RutUtils.formatRut('$rut-$dv');
+
+                    return ListTile(
+                      leading: Icon(
+                        Icons.business,
+                        color: isSelected ? _blueDarkColor : Colors.grey,
+                      ),
+                      title: Text(
+                        nombreEmpresa,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? _blueDarkColor : Colors.black,
+                        ),
+                      ),
+                      subtitle: Text('RUT: $rutFormateado'),
+                      trailing: isSelected
+                          ? Icon(Icons.check, color: _blueDarkColor)
+                          : null,
+                      onTap: () {
+                        final nuevaEmpresaToken = empresa['token_empresa'];
+                        Navigator.of(context, rootNavigator: true).pop();
+                        _cambiarEmpresa(nuevaEmpresaToken);
+                        mostrarSnackBarGlobal(context, 'Cambiada a: $nombreEmpresa');
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _blueDarkColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Cerrar'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 🆕 Modificación de _buildEmpresaInfo para que sea táctil
   Widget _buildEmpresaInfo() {
     final empresa = _getEmpresaSeleccionada();
     if (empresa == null || empresa.isEmpty) return const SizedBox.shrink();
@@ -968,14 +1059,37 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     if (nombreEmpresa.isEmpty) return const SizedBox.shrink();
     final validezRelacion = empresa['validez_relacion']?.toString().toLowerCase() ?? '';
     if (validezRelacion.contains('no válida')) return const SizedBox.shrink();
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        nombreEmpresa,
-        style: TextStyle(
-          fontSize: 16,
-          color: Colors.grey.shade700,
-          fontWeight: FontWeight.w500,
+      child: InkWell(
+        onTap: _mostrarSelectorEmpresas,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _blueDarkColor.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                nombreEmpresa,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.swap_horiz,
+                size: 18,
+                color: _blueDarkColor,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1561,7 +1675,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           if (mostrarOpciones)
             IconButton(
-              icon: Icon(Icons.more_vert, color: _blueDarkColor),
+              icon: Icon(Icons.add, color: _blueDarkColor), // 👈 Cambiado a +
               onPressed: _showOptionsMenu,
               tooltip: 'Opciones',
             ),
@@ -1609,9 +1723,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               onLogout: _logout,
               empresaSeleccionada: _empresaSeleccionada,
               onRefresh: _verificarSesionActualizada,
-              onEditComplete: goToProfilePage, // ← NUEVO
+              onEditComplete: goToProfilePage,
             ),
-
           ],
         ),
       ),
