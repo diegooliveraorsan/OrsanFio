@@ -33,13 +33,11 @@ class RutUtils {
     try {
       String cleanRut = rut.replaceAll('.', '').replaceAll('-', '').toUpperCase();
 
-      // ✅ VALIDACIÓN: RUT DEBE TENER AL MENOS 8 DÍGITOS (sin contar el DV)
-      if (cleanRut.length < 9) return false; // Mínimo 8 dígitos + 1 DV
+      if (cleanRut.length < 9) return false;
 
       String numero = cleanRut.substring(0, cleanRut.length - 1);
       String dv = cleanRut.substring(cleanRut.length - 1);
 
-      // ✅ VALIDACIÓN: EL NÚMERO DEBE TENER AL MENOS 8 DÍGITOS
       if (numero.length < 8) return false;
 
       if (int.tryParse(numero) == null) return false;
@@ -80,7 +78,6 @@ class RutUtils {
   }
 }
 
-// Color de fondo para tarjetas (aprobado)
 const Color _approvedCardBackground = Color(0xFFE8F0FE);
 
 // ✅ PANTALLA DE CONFIRMACIÓN ANTES DEL ESCANEO
@@ -105,15 +102,12 @@ class ScanConfirmationScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Logo FIO
               Image.asset(
                 'assets/images/logo_fio.png',
                 height: 80,
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 32),
-
-              // Icono de cámara
               Container(
                 width: 100,
                 height: 100,
@@ -132,8 +126,6 @@ class ScanConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-
-              // Título
               Text(
                 'Verificación de Identidad',
                 style: TextStyle(
@@ -144,8 +136,6 @@ class ScanConfirmationScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-
-              // Descripción
               const Text(
                 'A continuación se realizará:',
                 style: TextStyle(
@@ -155,8 +145,6 @@ class ScanConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // Pasos del proceso
               _buildStep(
                 number: 1,
                 title: 'Escaneo de Carnet de Identidad',
@@ -169,8 +157,6 @@ class ScanConfirmationScreen extends StatelessWidget {
                 description: 'Captura biométrica de su rostro',
               ),
               const SizedBox(height: 32),
-
-              // Recomendaciones
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -207,8 +193,6 @@ class ScanConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-
-              // Botones
               Row(
                 children: [
                   Expanded(
@@ -243,7 +227,6 @@ class ScanConfirmationScreen extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(height: 40),
             ],
           ),
@@ -363,15 +346,12 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
   final TextEditingController _rutController = TextEditingController();
   String _rutError = '';
 
-  // ✅ NUEVO: SELECTOR DE TIPO DE RELACIÓN
-  String? _tipoRelacionSeleccionada; // 'autorizador' o 'representante'
+  String? _tipoRelacionSeleccionada;
 
-  // ✅ Controlador para manejar la animación localmente
   late AnimationController _loadingController;
   OverlayEntry? _loadingOverlayEntry;
   bool _showLocalLoading = false;
 
-  // ✅ FOCUS NODE PARA EL CAMPO RUT
   final FocusNode _rutFocusNode = FocusNode();
 
   @override
@@ -380,7 +360,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     WidgetsBinding.instance.addObserver(this);
     _faceService = FaceApiService();
 
-    // ✅ INICIALIZAR CONTROLADOR DE ANIMACIÓN LOCAL
     _loadingController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -402,9 +381,9 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _loadingController.dispose();
-    _removeLoadingOverlay(); // ✅ LIMPIAR OVERLAY
+    _removeLoadingOverlay();
     _rutController.dispose();
-    _rutFocusNode.dispose(); // ✅ DISPOSE DEL FOCUS NODE
+    _rutFocusNode.dispose();
     super.dispose();
   }
 
@@ -413,7 +392,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     print('📱 AppLifecycleState cambiado: $state');
   }
 
-  // ✅ MÉTODO PARA MOSTRAR PANTALLA DE CONFIRMACIÓN
   void _showScanConfirmation() {
     if (!mounted) return;
 
@@ -433,7 +411,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     );
   }
 
-  // ✅ MOSTRAR ANIMACIÓN LOCAL
   void _showLocalLoadingAnimation() {
     if (!mounted) return;
 
@@ -487,7 +464,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     Overlay.of(context).insert(_loadingOverlayEntry!);
   }
 
-  // ✅ OCULTAR ANIMACIÓN LOCAL
   void _hideLocalLoadingAnimation() {
     if (_loadingOverlayEntry != null) {
       _loadingOverlayEntry!.remove();
@@ -503,7 +479,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     }
   }
 
-  // ✅ MÉTODO PARA LIMPIAR OVERLAY
   void _removeLoadingOverlay() {
     if (_loadingOverlayEntry != null) {
       _loadingOverlayEntry!.remove();
@@ -550,7 +525,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     });
   }
 
-  // ✅ MÉTODO PARA CERRAR EL TECLADO
   void _closeKeyboard() {
     FocusScope.of(context).unfocus();
   }
@@ -652,7 +626,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
       return;
     }
 
-    // ✅ CORREGIDO: Ahora verifica solo si contiene '✓'
     if (!_documentStatus.contains('✓')) {
       if (mounted) GlobalSnackBars.mostrarInfo(context, 'Primero debe completar la verificación de documento');
       return;
@@ -735,7 +708,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
   String _getCurrentStepMessage() {
     final hasValidRut = _rutController.text.isNotEmpty && _rutError.isEmpty;
-    // ✅ CORREGIDO: Ahora verifica solo si contiene '✓'
     final hasDocument = _documentStatus.contains('✓');
     final hasFace = _faceStatus.contains('✓');
     final hasTipoRelacion = _tipoRelacionSeleccionada != null;
@@ -756,7 +728,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
   bool _canRequestCredit() {
     final hasValidRut = _rutController.text.isNotEmpty && _rutError.isEmpty;
-    // ✅ CORREGIDO: Ahora verifica solo si contiene '✓'
     final hasDocument = _documentStatus.contains('✓');
     final hasFace = _faceStatus.contains('✓');
     final hasTipoRelacion = _tipoRelacionSeleccionada != null;
@@ -778,7 +749,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
         hasValidFacialImage;
   }
 
-  // ✅ MÉTODO PARA CONVERTIR TIPO DE RELACIÓN A VALOR NUMÉRICO
   String? _convertirTipoRelacionANumero(String? tipoRelacion) {
     if (tipoRelacion == 'autorizador') {
       return '1';
@@ -788,7 +758,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     return null;
   }
 
-  // ✅ MÉTODO PARA AUTENTICAR COMPRADOR
   Future<void> _solicitarLineaCredito() async {
     if (!mounted) {
       print('❌ Widget no montado al solicitar línea de crédito');
@@ -816,15 +785,15 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
       print('🔐 Enviando solicitud de línea de crédito...');
 
-      print(      "token_comprador: $tokenComprador");
-      print(      "run_comprador: ${runComprador['numero']}");
-      print(      "dv_comprador: ${runComprador['dv']}");
-      print(      "nombres_comprador: ${_lastDocumentResult?['documentData']?['nombres'] ?? ''}");
-      print(      "apellidos_comprador: ${_lastDocumentResult?['documentData']?['apellidos'] ?? ''}");
-      print(      "rut_empresa: ${rutEmpresa['numero']}");
-      print(      "dv_empresa: ${rutEmpresa['dv']}");
-      print(      "represetante_o_autorizador: ${tipoRelacionNumerico}");
-      print(      "detalle_carnet: $detalleCarnet");
+      print("token_comprador: $tokenComprador");
+      print("run_comprador: ${runComprador['numero']}");
+      print("dv_comprador: ${runComprador['dv']}");
+      print("nombres_comprador: ${_lastDocumentResult?['documentData']?['nombres'] ?? ''}");
+      print("apellidos_comprador: ${_lastDocumentResult?['documentData']?['apellidos'] ?? ''}");
+      print("rut_empresa: ${rutEmpresa['numero']}");
+      print("dv_empresa: ${rutEmpresa['dv']}");
+      print("represetante_o_autorizador: ${tipoRelacionNumerico}");
+      print("detalle_carnet: $detalleCarnet");
 
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/AutenticarComprador/api/v1/'),
@@ -936,28 +905,23 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
   String _buildDetalleCarnet() {
     try {
-      // 📄 DATOS DEL DOCUMENTO (incluyendo la foto)
       Map<String, dynamic> documentoData = {};
       if (_lastDocumentResult != null && _lastDocumentResult!['documentData'] != null) {
         documentoData = Map<String, dynamic>.from(_lastDocumentResult!['documentData']!);
       }
 
-      // Agregar la foto facial extraída del carnet (si existe)
       final String? fotoCarnet = _lastDocumentResult?['documentFaceImage']?['faceImage'];
       if (fotoCarnet != null && fotoCarnet.isNotEmpty) {
         documentoData['foto'] = fotoCarnet;
       }
 
-      // 🧬 DATOS DE BIOMETRÍA (sin logs)
       Map<String, dynamic> biometriaData = {};
       if (_lastFaceResult != null) {
         biometriaData = Map<String, dynamic>.from(_lastFaceResult!);
-        // Eliminar campos pesados
         biometriaData.remove('diagnosticLogs');
-        biometriaData.remove('faceImage'); // por si acaso estuviera
+        biometriaData.remove('faceImage');
       }
 
-      // 📦 ESTRUCTURA FINAL
       final Map<String, dynamic> detalle = {
         'documento': documentoData,
         'biometria': biometriaData,
@@ -987,7 +951,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     });
   }
 
-  // ✅ NUEVO MÉTODO: CONSTRUIR SELECTOR DE TIPO DE RELACIÓN
   Widget _buildSelectorTipoRelacion() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1031,7 +994,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     );
   }
 
-  // ✅ NUEVO MÉTODO: CONSTRUIR OPCIÓN DE RELACIÓN
   Widget _buildOpcionRelacion({
     required String titulo,
     required String subtitulo,
@@ -1144,7 +1106,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     );
   }
 
-  // ✅ NUEVO MÉTODO: TEXTO EXPLICATIVO DEL TIPO DE RELACIÓN (REPLICADO DE LA VISTA 1)
+  // ✅ AGREGADO: MÉTODO PARA MOSTRAR TEXTO EXPLICATIVO (REPLICADO DE VISTA 1)
   Widget _buildInfoTipoRelacion(String tipoRelacion) {
     final Map<String, Map<String, String>> infoTipos = {
       'autorizador': {
@@ -1275,7 +1237,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
               _buildSelectorTipoRelacion(),
 
-              // ✅ TEXTO EXPLICATIVO AGREGADO (SOLO CUANDO HAY SELECCIÓN)
+              // ✅ AGREGADO: TEXTO EXPLICATIVO DESPUÉS DE SELECCIONAR TIPO DE RELACIÓN
               if (_tipoRelacionSeleccionada != null) ...[
                 const SizedBox(height: 16),
                 _buildInfoTipoRelacion(_tipoRelacionSeleccionada!),
@@ -1368,7 +1330,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
         ),
         const SizedBox(height: 16),
 
-        // ✅ VERSIÓN SIMPLIFICADA SIN LayoutBuilder
         Container(
           width: double.infinity,
           child: Row(
@@ -1412,22 +1373,20 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
     required bool isCompleted,
     required bool isEnabled,
   }) {
-    // ✅ Determinar si es el botón de Rostro (stepNumber == 2) y está desactivado
     final bool isFaceCardDisabled = stepNumber == 2 && !isEnabled;
 
     return Container(
       height: 200,
       decoration: BoxDecoration(
-        // ✅ Si es el botón de Rostro desactivado, usar gris, sino el color normal
         color: isFaceCardDisabled
-            ? Colors.grey.shade200  // Gris para Rostro desactivado
+            ? Colors.grey.shade200
             : _approvedCardBackground,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCompleted
               ? GlobalVariables.blueDarkColor.withOpacity(0.5)
               : (isFaceCardDisabled
-              ? Colors.grey.shade400  // Borde gris para Rostro desactivado
+              ? Colors.grey.shade400
               : Colors.grey.shade300),
           width: isCompleted ? 2 : 1.5,
         ),
@@ -1451,7 +1410,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.max,
               children: [
-                // ÍCONO GRANDE
                 Container(
                   width: 70,
                   height: 70,
@@ -1459,7 +1417,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                     color: isCompleted
                         ? GlobalVariables.blueDarkColor.withOpacity(0.15)
                         : (isFaceCardDisabled
-                        ? Colors.grey.shade300  // Fondo gris para ícono desactivado
+                        ? Colors.grey.shade300
                         : (isEnabled
                         ? GlobalVariables.blueDarkColor.withOpacity(0.1)
                         : Colors.grey.shade300)),
@@ -1471,7 +1429,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                     color: isCompleted
                         ? GlobalVariables.blueDarkColor
                         : (isFaceCardDisabled
-                        ? Colors.grey.shade500  // Ícono gris para Rostro desactivado
+                        ? Colors.grey.shade500
                         : (isEnabled
                         ? GlobalVariables.blueDarkColor
                         : Colors.grey.shade600)),
@@ -1480,7 +1438,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
                 const SizedBox(height: 16),
 
-                // NÚMERO DE PASO Y TÍTULO
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1491,7 +1448,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                         color: isCompleted
                             ? GlobalVariables.blueDarkColor
                             : (isFaceCardDisabled
-                            ? Colors.grey.shade500  // Círculo del número gris
+                            ? Colors.grey.shade500
                             : (isEnabled
                             ? GlobalVariables.blueDarkColor
                             : Colors.grey.shade400)),
@@ -1515,7 +1472,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: isFaceCardDisabled
-                            ? Colors.grey.shade600  // Texto gris para Rostro desactivado
+                            ? Colors.grey.shade600
                             : (isEnabled ? Colors.black : Colors.grey.shade600),
                       ),
                     ),
@@ -1524,7 +1481,6 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
                 const SizedBox(height: 12),
 
-                // ESTADO
                 Container(
                   constraints: BoxConstraints(
                     maxWidth: double.infinity,
@@ -1536,7 +1492,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
                       color: isCompleted
                           ? GlobalVariables.blueDarkColor
                           : (isFaceCardDisabled
-                          ? Colors.grey.shade500  // Estado en gris
+                          ? Colors.grey.shade500
                           : (isEnabled
                           ? Colors.grey.shade700
                           : Colors.grey.shade500)),

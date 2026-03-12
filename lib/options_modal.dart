@@ -2015,6 +2015,10 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
           final mensaje = responseData['message'] ?? 'Autorizador asignado exitosamente';
           print('✅ ÉXITO: $mensaje');
           onAsignarAutorizador(run);
+
+          // 🔄 Recargar la lista de autorizadores para reflejar el cambio
+          _cargarAutorizadores();
+
           if (onActualizarAutorizadores != null) {
             print('🔄 Ejecutando onActualizarAutorizadores...');
             onActualizarAutorizadores();
