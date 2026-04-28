@@ -2,6 +2,7 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://maven.regulaforensics.com/RegulaDocumentReader") }
     }
 
     dependencies {

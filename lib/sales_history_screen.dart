@@ -255,6 +255,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     color: Colors.grey.shade600,
                   ),
                 ),
+                const SizedBox(height: 24),
+                // ✅ NUEVO BOTÓN DE RECARGAR SIEMPRE VISIBLE
+                ElevatedButton(
+                  onPressed: _fetchSalesHistory,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0055B8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Recargar',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
                 if (_errorMessage.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   ElevatedButton(
@@ -589,11 +604,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   Color _getStatusColor(int estado) {
     switch (estado) {
       case 0:
-        return const Color(0xFF757575);
+        //return const Color(0xFF757575);
+        return const Color(0xFFD32E2F);
       case 1:
         return const Color(0xFF0055B8);
       case 2:
-        return const Color(0xFFFF9800);
+        //return const Color(0xFFFF9800);
+        return const Color(0xFF757575);
       default:
         return Colors.grey;
     }
@@ -602,7 +619,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   Color _getBackgroundColor(int estado) {
     switch (estado) {
       case 0:
-        return const Color(0xFFF5F5F5);
+        return const Color(0xFFFFEFEF);
       case 1:
         return const Color(0xFFE8F0FE);
       case 2:
@@ -627,7 +644,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             Text(
               'Rechazada',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: _getStatusColor(estado),
               ),
@@ -647,7 +664,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             Text(
               'Aprobada',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: _getStatusColor(estado),
               ),
@@ -658,7 +675,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         return Text(
           'Pendiente',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             color: _getStatusColor(estado),
           ),
@@ -667,7 +684,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         return Text(
           'Desconocido',
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             color: _getStatusColor(estado),
           ),
@@ -888,8 +905,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   Text(
                     _formatDate(fechaVenta),
                     style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
                     ),
                   ),
                 ],

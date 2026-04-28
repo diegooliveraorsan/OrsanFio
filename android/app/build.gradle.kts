@@ -1,5 +1,6 @@
 import java.io.FileInputStream
 import java.util.Properties
+import java.io.File
 
 plugins {
     id("com.android.application")
@@ -8,11 +9,34 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-// ✅ CONFIGURACIÓN DE FIRMA
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+tasks.register("createProguardRules") {
+    doLast {
+        val proguardFile = file("proguard-rules.pro")
+        proguardFile.writeText(
+            """
+            -keep class com.regula.** { *; }
+            -keep class com.regula.face.** { *; }
+            -keep class com.regula.document.** { *; }
+            -keep class com.google.firebase.** { *; }
+            -keepclassmembers class * {
+                @android.webkit.JavascriptInterface <methods>;
+            }
+            -dontwarn okhttp3.**
+            -dontwarn okio.**
+            """.trimIndent()
+        )
+        println("✅ Archivo proguard-rules.pro generado automáticamente")
+    }
+}
+
+tasks.preBuild {
+    dependsOn("createProguardRules")
 }
 
 android {
@@ -29,7 +53,6 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
-    // ✅ CONFIGURACIÓN DE FIRMA
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
@@ -43,20 +66,31 @@ android {
         applicationId = "com.orsanfio.orsanfio"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        //versionCode = flutter.versionCode
-        //versionName = flutter.versionName
-        versionCode = 7
-        versionName = "1.0.1"
+        versionCode = 14
+        versionName = "1.1.0"
     }
-
+    aaptOptions {
+        noCompress("Regula/faceSdkResource.dat")
+    }
     buildTypes {
+        debug {}
         release {
-            // ✅ FIRMA DE PRODUCCIÓN
             signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = false
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.regula.face:api:+@aar") {
+        isTransitive = true
+    }
+    implementation("com.regula.face.core:basic:+@aar")
 }

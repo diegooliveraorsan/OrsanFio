@@ -52,11 +52,11 @@ dependencies:
 
   # Opcional: Para animaciones más fluidas
   animations: ^2.0.8
+  flutter_face_api: ^8.1.885
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_face_api: "7.2.626"
   flutter_face_core_basic: "7.2.235"
   flutter_lints: ^2.0.0
   flutter_launcher_icons: "^0.13.1"
@@ -71,4 +71,5 @@ flutter:
 flutter_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icons/icon_330x330.jpeg"
+  #image_path: "assets/icons/icon_330x330.jpeg"
+  image_path: "assets/icons/logo_orsan.png"

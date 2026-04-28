@@ -5,8 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image/image.dart' as img;
-import 'selfie_camera_screen.dart';
+// import 'selfie_camera_screen.dart';
 import 'package:flutter_face_api/flutter_face_api.dart';
+
 
 class FaceApiService {
   static const String _apiBaseUrl = 'https://biometria.orsanevaluaciones.cl';
@@ -25,7 +26,7 @@ class FaceApiService {
   String? _currentTransactionId;
   String? _currentTag;
 
-  // ✅ MÉTODO PRINCIPAL - COMPLETO
+  // ✅ MÉTODO PRINCIPAL - COMPLETO CON REINTENTOS
   Future<Map<String, dynamic>> captureAndVerifyFace({
     required Map<String, dynamic>? documentData,
     BuildContext? specificContext,
@@ -40,13 +41,25 @@ class FaceApiService {
 
       _addLog('📄 Documento disponible: $hasValidDocument', 'info');
 
-      // ✅ 2. INICIALIZAR SDK DE REGULA
+      // ✅ 2. INICIALIZAR SDK DE REGULA (CON REINTENTOS)
       _addLog('\n1️⃣ INICIALIZANDO SDK REGULA', 'phase');
 
-      final bool sdkInitialized = await _initializeRegulaSDK();
+      bool sdkInitialized = false;
+      int initAttempts = 0;
+      const int maxInitAttempts = 3;
+
+      while (!sdkInitialized && initAttempts < maxInitAttempts) {
+        initAttempts++;
+        _addLog('🔁 Intento de inicialización $initAttempts de $maxInitAttempts', 'debug');
+        sdkInitialized = await _initializeRegulaSDK();
+        if (!sdkInitialized && initAttempts < maxInitAttempts) {
+          _addLog('⏳ Esperando 1 segundo antes de reintentar...', 'debug');
+          await Future.delayed(const Duration(seconds: 1));
+        }
+      }
+
       if (!sdkInitialized) {
-        _addLog('⚠️ SDK no inicializado, usando modo HTTP', 'warning');
-        return await _fallbackToHttpMethod(documentData, specificContext);
+        return _buildErrorResponse('Problemas de conexión 1');
       }
 
       _addLog('✅ SDK inicializado correctamente', 'success');
@@ -57,7 +70,7 @@ class FaceApiService {
       final Map<String, dynamic> sessionResult = await _createLivenessSession();
 
       if (!sessionResult['success']) {
-        return _buildErrorResponse('No se pudo crear sesión: ${sessionResult['error']}');
+        return _buildErrorResponse('Problemas de conexión 2');
       }
 
       _currentTransactionId = sessionResult['transactionId'];
@@ -67,14 +80,33 @@ class FaceApiService {
       _addLog('🆔 TransactionId: $_currentTransactionId', 'info');
       _addLog('🏷️ Tag: $_currentTag', 'info');
 
-      // ✅ 4. EJECUTAR LIVENESS CON SDK
+      // ✅ 4. EJECUTAR LIVENESS CON SDK (CON REINTENTOS)
       _addLog('\n3️⃣ EJECUTANDO LIVENESS CON SDK', 'phase');
 
-      final Map<String, dynamic> livenessResult = await _executeLivenessWithSDK();
+      Map<String, dynamic> livenessResult = {};
+      int livenessAttempts = 0;
+      const int maxLivenessAttempts = 1;
+      bool livenessSuccess = false;
 
-      if (!livenessResult['success']) {
-        _addLog('❌ Liveness falló: ${livenessResult['error']}', 'error');
-        return await _fallbackToHttpMethod(documentData, specificContext);
+      while (!livenessSuccess && livenessAttempts < maxLivenessAttempts) {
+        livenessAttempts++;
+        _addLog('🔁 Intento de liveness $livenessAttempts de $maxLivenessAttempts', 'debug');
+        livenessResult = await _executeLivenessWithSDK();
+
+        if (livenessResult['success'] == true) {
+          livenessSuccess = true;
+          break;
+        } else {
+          _addLog('⚠️ Liveness falló en intento $livenessAttempts: ${livenessResult['error']}', 'warning');
+          if (livenessAttempts < maxLivenessAttempts) {
+            _addLog('⏳ Esperando 1 segundo antes de reintentar...', 'debug');
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        }
+      }
+
+      if (!livenessSuccess) {
+        return _buildErrorResponse('Problemas de conexión 3');
       }
 
       final bool isLive = livenessResult['isLive'] ?? false;
@@ -102,29 +134,19 @@ class FaceApiService {
       // ✅ 6. OBTENER SELFIE DEL LIVENESS
       Uint8List? livenessSelfieBytes = livenessResult['selfieFromLiveness'] as Uint8List?;
 
+      // MODIFICADO: Si el SDK no devuelve selfie, se considera error (ya no se captura manualmente)
       if (livenessSelfieBytes == null || livenessSelfieBytes.isEmpty) {
-        // Si el SDK no devuelve selfie, capturar una manualmente
-        _addLog('\n4️⃣ CAPTURANDO SELFIE MANUALMENTE', 'phase');
-
-        livenessSelfieBytes = await _captureSelfieImage(
-          specificContext: specificContext,
-        );
-
-        if (livenessSelfieBytes == null || livenessSelfieBytes.isEmpty) {
-          return _buildErrorResponse('Captura de selfie cancelada o sin imagen');
-        }
-
-        _addLog('✅ Selfie capturada: ${livenessSelfieBytes.length ~/ 1024} KB', 'success');
-      } else {
-        _addLog('\n4️⃣ SELFIE DEL LIVENESS OBTENIDA', 'phase');
-        _addLog('✅ Selfie del liveness: ${livenessSelfieBytes.length ~/ 1024} KB', 'success');
+        return _buildErrorResponse('Problemas de conexión 4');
       }
+
+      _addLog('\n4️⃣ SELFIE DEL LIVENESS OBTENIDA', 'phase');
+      _addLog('✅ Selfie del liveness: ${livenessSelfieBytes.length ~/ 1024} KB', 'success');
 
       // ✅ 7. ESTANDARIZAR SELFIE
       _addLog('\n5️⃣ ESTANDARIZANDO SELFIE', 'phase');
       final Uint8List? standardizedSelfie = await _standardizeSelfieImage(livenessSelfieBytes!);
       if (standardizedSelfie == null) {
-        return _buildErrorResponse('Error estandarizando selfie');
+        return _buildErrorResponse('Error procesando imagen');
       }
 
       _addLog('✅ Selfie estandarizada: ${standardizedSelfie.length ~/ 1024} KB', 'success');
@@ -221,7 +243,7 @@ class FaceApiService {
 
     } catch (e) {
       _addLog('💥 ERROR CRÍTICO: $e', 'critical');
-      return _buildErrorResponse('Error en verificación facial: $e');
+      return _buildErrorResponse('Problemas de conexión 5');
     }
   }
 
@@ -303,7 +325,6 @@ class FaceApiService {
 
       // Extraer la selfie (la imagen ya está en Uint8List)
       final Uint8List? selfieBytes = result.image;
-
 
       return {
         'success': true,
@@ -439,7 +460,8 @@ class FaceApiService {
     }
   }
 
-  // ✅ MÉTODO FALLBACK (HTTP cuando SDK no funciona)
+  // ✅ MÉTODO FALLBACK (HTTP cuando SDK no funciona) - MODIFICADO: Comentado para deshabilitar
+  /*
   Future<Map<String, dynamic>> _fallbackToHttpMethod(
       Map<String, dynamic>? documentData,
       BuildContext? specificContext,
@@ -512,6 +534,7 @@ class FaceApiService {
       return _buildErrorResponse('Error en fallback: $e');
     }
   }
+  */
 
   // ✅ COMPARAR CON DOCUMENTO (método HTTP alternativo)
   Future<Map<String, dynamic>> _compareWithDocumentHTTP({
@@ -661,7 +684,8 @@ class FaceApiService {
     return 'orsan_${timestamp}_$random';
   }
 
-  // ✅ CAPTURAR SELFIE
+  // ✅ CAPTURAR SELFIE - MODIFICADO: Comentado porque ya no se usa
+  /*
   Future<Uint8List?> _captureSelfieImage({BuildContext? specificContext}) async {
     final Completer<Uint8List?> completer = Completer<Uint8List?>();
     final BuildContext? contextToUse = specificContext ?? navigatorKey.currentContext;
@@ -699,6 +723,7 @@ class FaceApiService {
 
     return completer.future;
   }
+  */
 
   // ✅ ESTANDARIZAR SELFIE
   Future<Uint8List?> _standardizeSelfieImage(Uint8List originalSelfie) async {

@@ -4,81 +4,37 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'variables_globales.dart'; // Contiene GlobalVariables, GlobalInputStyles, GlobalSnackBars
+import 'variables_globales.dart';
 
-// ✅ COLORES GLOBALES (MISMO QUE PERFIL)
 final Color _blueDarkColor = const Color(0xFF0055B8);
 final Color _approvedCardBackground = const Color(0xFFE8F0FE);
 
-// ✅ ESTILOS ESTANDARIZADOS PARA SNACKBARS (MISMO COLOR GRIS)
-void mostrarSnackBar(BuildContext context, String mensaje) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        mensaje,
-        style: const TextStyle(color: Colors.white),
-      ),
-      backgroundColor: Colors.grey[800],
-      duration: const Duration(seconds: 3),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-    ),
-  );
-}
-
-// ✅ REINICIAR LA APLICACIÓN NAVEGANDO AL MAIN
 void reiniciarAplicacion(BuildContext context) {
-  print('🔄 Reiniciando aplicación desde OptionsModal...');
-  Navigator.pushNamedAndRemoveUntil(
-    context,
-    '/',
-        (route) => false,
-  );
-  if (Navigator.canPop(context)) {
-    Navigator.popUntil(context, (route) => route.isFirst);
-  }
+  Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+  if (Navigator.canPop(context)) Navigator.popUntil(context, (route) => route.isFirst);
 }
 
-// ✅ CLASE PARA MANEJAR TOKENS FCM DE MANERA SEGURA
 class FCMTokenManager {
   static Future<String> getDeviceToken() async {
     try {
-      print('🔄 Inicializando Firebase para obtener token...');
       await Firebase.initializeApp();
-      print('🔄 Obteniendo token FCM...');
       String? fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken != null) {
-        print('✅ Token FCM obtenido exitosamente');
-        return fcmToken;
-      } else {
-        print('⚠️ Token FCM es null, reintentando...');
-        await Future.delayed(const Duration(seconds: 1));
-        fcmToken = await FirebaseMessaging.instance.getToken();
-        if (fcmToken != null) {
-          print('✅ Token FCM obtenido en segundo intento');
-          return fcmToken;
-        } else {
-          print('⚠️ No se pudo obtener token FCM, creando fallback');
-          return 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
-        }
-      }
+      if (fcmToken != null) return fcmToken;
+      await Future.delayed(const Duration(seconds: 1));
+      fcmToken = await FirebaseMessaging.instance.getToken();
+      return fcmToken ?? 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
     } catch (e) {
-      print('❌ Error obteniendo token FCM: $e');
       return 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
     }
   }
 }
 
-// Clase estática para manejar el modal de opciones
 class OptionsModal {
-  // Método estático para mostrar el modal de opciones
   static Future<void> show({
     required BuildContext context,
     required Map<String, dynamic> userData,
     required String? empresaSeleccionada,
-    required Function(String) onCambiarEmpresa, // Se mantiene por compatibilidad pero no se usa
+    required Function(String) onCambiarEmpresa,
     required VoidCallback onMostrarAutorizadores,
     required VoidCallback onMostrarNuevaEmpresa,
     required VoidCallback onReiniciarApp,
@@ -90,9 +46,7 @@ class OptionsModal {
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       isScrollControlled: true,
       builder: (context) {
         return Container(
@@ -100,27 +54,17 @@ class OptionsModal {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Opciones',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _blueDarkColor,
-                ),
-              ),
+              Text('Opciones', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _blueDarkColor)),
               const SizedBox(height: 20),
-
-              // ✅ BOTÓN PARA NUEVA EMPRESA
               _buildOptionItem(
                 icon: Icons.add_business,
                 title: 'Agregar nueva empresa',
                 subtitle: 'Registrar nueva empresa con RUT',
                 onTap: () {
-                  Navigator.pop(context); // Cerrar el modal
-                  onMostrarNuevaEmpresa(); // ✅ Llamar al callback para mostrar pantalla
+                  // ✅ No cerramos el modal aquí para que podamos cerrarlo después desde la pantalla de nueva empresa
+                  onMostrarNuevaEmpresa();
                 },
               ),
-
               if (esRepresentanteValido) ...[
                 const SizedBox(height: 16),
                 _buildOptionItem(
@@ -133,20 +77,12 @@ class OptionsModal {
                   },
                 ),
               ],
-
               const SizedBox(height: 20),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _blueDarkColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: _blueDarkColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                   child: const Text('Cerrar'),
                 ),
               ),
@@ -157,7 +93,6 @@ class OptionsModal {
     );
   }
 
-  // NUEVO: Pantalla completa de autorizadores
   static Widget crearVistaAutorizadores({
     required BuildContext context,
     required Map<String, dynamic> userData,
@@ -177,11 +112,10 @@ class OptionsModal {
     );
   }
 
-  // ✅ NUEVO: CREAR VISTA DE NUEVA EMPRESA (AHORA CON PIN)
   static Widget crearVistaNuevaEmpresa({
     required BuildContext context,
     required Map<String, dynamic> userData,
-    required Function(String, String, String) onAgregarEmpresa,
+    required Future<bool> Function(String, String, String) onAgregarEmpresa,
     required VoidCallback onVolver,
     required VoidCallback onReiniciarApp,
     required VoidCallback onActualizarDashboard,
@@ -196,69 +130,30 @@ class OptionsModal {
     );
   }
 
-  // Métodos auxiliares
-  static Map<String, dynamic>? _getEmpresaSeleccionada(
-      Map<String, dynamic> userData,
-      String? empresaSeleccionada,
-      ) {
+  static Map<String, dynamic>? _getEmpresaSeleccionada(Map<String, dynamic> userData, String? empresaSeleccionada) {
     if (empresaSeleccionada == null) return null;
     final empresas = userData['empresas'] ?? [];
-    return empresas.firstWhere(
-          (emp) => emp['token_empresa'] == empresaSeleccionada,
-      orElse: () => {},
-    );
+    return empresas.firstWhere((emp) => emp['token_empresa'] == empresaSeleccionada, orElse: () => {});
   }
 
   static bool _esRepresentanteValido(Map<String, dynamic>? empresa) {
     if (empresa == null || empresa.isEmpty) return false;
     final tipoRelacion = empresa['tipo_relacion']?.toString().toLowerCase() ?? '';
     final validezRelacion = empresa['validez_relacion']?.toString().toLowerCase() ?? '';
-    return tipoRelacion.contains('representante') &&
-        !validezRelacion.contains('no válida');
+    return tipoRelacion.contains('representante') && !validezRelacion.contains('no válida');
   }
 
-  static Widget _buildOptionItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
+  static Widget _buildOptionItem({required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
     return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: _blueDarkColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          icon,
-          color: _blueDarkColor,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: Colors.black,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: 14,
-          color: Colors.grey.shade600,
-        ),
-      ),
+      leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: _blueDarkColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: _blueDarkColor, size: 20)),
+      title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black)),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: onTap,
       contentPadding: EdgeInsets.zero,
     );
   }
 
-  // Métodos auxiliares para RUT (usados en otras pantallas)
   static String _formatRut(String rut) {
     String cleanRut = rut.replaceAll('.', '').replaceAll('-', '');
     if (cleanRut.length < 2) return rut;
@@ -266,9 +161,7 @@ class OptionsModal {
     String dv = cleanRut.substring(cleanRut.length - 1);
     String formatted = '';
     for (int i = numero.length - 1, j = 0; i >= 0; i--, j++) {
-      if (j > 0 && j % 3 == 0) {
-        formatted = '.$formatted';
-      }
+      if (j > 0 && j % 3 == 0) formatted = '.$formatted';
       formatted = numero[i] + formatted;
     }
     return '$formatted-$dv'.toUpperCase();
@@ -283,8 +176,7 @@ class OptionsModal {
       String dv = cleanRut.substring(cleanRut.length - 1);
       if (numero.length < 7) return false;
       if (int.tryParse(numero) == null) return false;
-      int rutNumerico = int.parse(numero);
-      if (rutNumerico < 1000000) return false;
+      if (int.parse(numero) < 1000000) return false;
       String expectedDv = _calculateDv(numero);
       return dv == expectedDv;
     } catch (e) {
@@ -314,11 +206,7 @@ class OptionsModal {
     return {'numero': numero, 'dv': dv};
   }
 
-  static bool _rutEmpresaYaExiste(
-      Map<String, dynamic> userData,
-      String rutEmpresa,
-      String dvEmpresa,
-      ) {
+  static bool _rutEmpresaYaExiste(Map<String, dynamic> userData, String rutEmpresa, String dvEmpresa) {
     try {
       final empresas = userData['empresas'] ?? [];
       for (final empresa in empresas) {
@@ -336,11 +224,13 @@ class OptionsModal {
   }
 }
 
-// ✅ CLASE PARA LA PANTALLA DE NUEVA EMPRESA (MODIFICADA PARA INCLUIR PIN)
+// =============================================================================
+// PANTALLA DE NUEVA EMPRESA (CIERRA MODAL CORRECTAMENTE)
+// =============================================================================
 class _NuevaEmpresaScreen extends StatefulWidget {
   final BuildContext context;
   final Map<String, dynamic> userData;
-  final Function(String, String, String) onAgregarEmpresa;
+  final Future<bool> Function(String, String, String) onAgregarEmpresa;
   final VoidCallback onVolver;
   final VoidCallback onReiniciarApp;
   final VoidCallback onActualizarDashboard;
@@ -375,20 +265,8 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _blueDarkColor),
-          onPressed: () {
-            widget.onVolver();
-          },
-        ),
-        title: Text(
-          'Agregar nueva empresa',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: _blueDarkColor,
-          ),
-        ),
+        leading: IconButton(icon: Icon(Icons.arrow_back, color: _blueDarkColor), onPressed: widget.onVolver),
+        title: Text('Agregar nueva empresa', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _blueDarkColor)),
       ),
       body: _buildContent(),
     );
@@ -403,10 +281,7 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
           _buildRutForm(),
           const SizedBox(height: 24),
           _buildSelectorTipoRelacion(),
-          if (_tipoRelacionSeleccionada != null) ...[
-            const SizedBox(height: 16),
-            _buildInfoTipoRelacion(_tipoRelacionSeleccionada!),
-          ],
+          if (_tipoRelacionSeleccionada != null) ...[const SizedBox(height: 16), _buildInfoTipoRelacion(_tipoRelacionSeleccionada!)],
           const SizedBox(height: 24),
           _buildPinField(),
           const SizedBox(height: 32),
@@ -421,38 +296,21 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'RUT de la empresa',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: _blueDarkColor,
-          ),
-        ),
+        Text('RUT de la empresa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _blueDarkColor)),
         const SizedBox(height: 12),
         TextFormField(
           controller: _rutController,
           decoration: InputDecoration(
             labelText: 'RUT (ej: 12.345.678-9)',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             filled: true,
             fillColor: Colors.grey.shade50,
-            suffixIcon: _rutController.text.isNotEmpty
-                ? Icon(
-              _rutValido ? Icons.check_circle : Icons.error,
-              color: _rutValido ? Colors.green : Colors.red,
-            )
-                : null,
+            suffixIcon: _rutController.text.isNotEmpty ? Icon(_rutValido ? Icons.check_circle : Icons.error, color: _rutValido ? Colors.green : Colors.red) : null,
           ),
           onChanged: (value) {
             final formattedRut = OptionsModal._formatRut(value);
             if (formattedRut != value) {
-              _rutController.value = TextEditingValue(
-                text: formattedRut,
-                selection: TextSelection.collapsed(offset: formattedRut.length),
-              );
+              _rutController.value = TextEditingValue(text: formattedRut, selection: TextSelection.collapsed(offset: formattedRut.length));
             }
             final valido = OptionsModal._validateRut(formattedRut);
             String mensajeDuplicado = '';
@@ -466,22 +324,13 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
             }
             setState(() {
               _rutValido = valido && mensajeDuplicado.isEmpty;
-              _mensajeValidacionRut = mensajeDuplicado.isNotEmpty
-                  ? mensajeDuplicado
-                  : (valido ? 'RUT válido' : 'RUT inválido');
+              _mensajeValidacionRut = mensajeDuplicado.isNotEmpty ? mensajeDuplicado : (valido ? 'RUT válido' : 'RUT inválido');
             });
           },
         ),
         if (_mensajeValidacionRut.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(
-            _mensajeValidacionRut,
-            style: TextStyle(
-              fontSize: 12,
-              color: _rutValido ? Colors.green : Colors.red,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          Text(_mensajeValidacionRut, style: TextStyle(fontSize: 12, color: _rutValido ? Colors.green : Colors.red, fontWeight: FontWeight.w500)),
         ],
       ],
     );
@@ -491,46 +340,20 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Tipo de relación con la empresa',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: _blueDarkColor,
-          ),
-        ),
+        Text('Tipo de relación con la empresa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _blueDarkColor)),
         const SizedBox(height: 12),
-
-        // ✅ OPCIÓN AUTORIZADOR
+        // Autorizador
         InkWell(
-          onTap: () {
-            setState(() {
-              _tipoRelacionSeleccionada = 'autorizador';
-            });
-          },
+          onTap: () => setState(() => _tipoRelacionSeleccionada = 'autorizador'),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(16),
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: _tipoRelacionSeleccionada == 'autorizador'
-                  ? _blueDarkColor.withOpacity(0.1)
-                  : Colors.grey.shade50,
+              color: _tipoRelacionSeleccionada == 'autorizador' ? _blueDarkColor.withOpacity(0.1) : Colors.grey.shade50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _tipoRelacionSeleccionada == 'autorizador'
-                    ? _blueDarkColor
-                    : Colors.grey.shade300,
-                width: _tipoRelacionSeleccionada == 'autorizador' ? 2 : 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.3),
-                  blurRadius: 3,
-                  offset: const Offset(0, 2),
-                  spreadRadius: 0,
-                ),
-              ],
+              border: Border.all(color: _tipoRelacionSeleccionada == 'autorizador' ? _blueDarkColor : Colors.grey.shade300, width: _tipoRelacionSeleccionada == 'autorizador' ? 2 : 1),
+              boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 3, offset: const Offset(0, 2), spreadRadius: 0)],
             ),
             child: Row(
               children: [
@@ -538,24 +361,11 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: _tipoRelacionSeleccionada == 'autorizador'
-                        ? _blueDarkColor
-                        : Colors.white,
+                    color: _tipoRelacionSeleccionada == 'autorizador' ? _blueDarkColor : Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _tipoRelacionSeleccionada == 'autorizador'
-                          ? _blueDarkColor
-                          : Colors.grey.shade400,
-                      width: 1.5,
-                    ),
+                    border: Border.all(color: _tipoRelacionSeleccionada == 'autorizador' ? _blueDarkColor : Colors.grey.shade400, width: 1.5),
                   ),
-                  child: Icon(
-                    Icons.person_outline,
-                    color: _tipoRelacionSeleccionada == 'autorizador'
-                        ? Colors.white
-                        : Colors.grey.shade600,
-                    size: 20,
-                  ),
+                  child: Icon(Icons.person_outline, color: _tipoRelacionSeleccionada == 'autorizador' ? Colors.white : Colors.grey.shade600, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -564,43 +374,14 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            'Autorizador',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _tipoRelacionSeleccionada == 'autorizador'
-                                  ? _blueDarkColor
-                                  : Colors.grey.shade800,
-                            ),
-                          ),
+                          Text('Autorizador', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _tipoRelacionSeleccionada == 'autorizador' ? _blueDarkColor : Colors.grey.shade800)),
                           const SizedBox(width: 8),
                           if (_tipoRelacionSeleccionada == 'autorizador')
-                            Container(
-                              width: 20,
-                              height: 20,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF4CAF50),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                            ),
+                            Container(width: 20, height: 20, decoration: const BoxDecoration(color: Color(0xFF4CAF50), shape: BoxShape.circle), child: const Icon(Icons.check, color: Colors.white, size: 14)),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'Persona autorizada para realizar compras',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _tipoRelacionSeleccionada == 'autorizador'
-                              ? _blueDarkColor.withOpacity(0.8)
-                              : Colors.grey.shade600,
-                        ),
-                      ),
+                      Text('Persona autorizada para realizar compras', style: TextStyle(fontSize: 12, color: _tipoRelacionSeleccionada == 'autorizador' ? _blueDarkColor.withOpacity(0.8) : Colors.grey.shade600)),
                     ],
                   ),
                 ),
@@ -608,36 +389,17 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
             ),
           ),
         ),
-
-        // ✅ OPCIÓN REPRESENTANTE
+        // Representante
         InkWell(
-          onTap: () {
-            setState(() {
-              _tipoRelacionSeleccionada = 'representante';
-            });
-          },
+          onTap: () => setState(() => _tipoRelacionSeleccionada = 'representante'),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _tipoRelacionSeleccionada == 'representante'
-                  ? _blueDarkColor.withOpacity(0.1)
-                  : Colors.grey.shade50,
+              color: _tipoRelacionSeleccionada == 'representante' ? _blueDarkColor.withOpacity(0.1) : Colors.grey.shade50,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _tipoRelacionSeleccionada == 'representante'
-                    ? _blueDarkColor
-                    : Colors.grey.shade300,
-                width: _tipoRelacionSeleccionada == 'representante' ? 2 : 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.3),
-                  blurRadius: 3,
-                  offset: const Offset(0, 2),
-                  spreadRadius: 0,
-                ),
-              ],
+              border: Border.all(color: _tipoRelacionSeleccionada == 'representante' ? _blueDarkColor : Colors.grey.shade300, width: _tipoRelacionSeleccionada == 'representante' ? 2 : 1),
+              boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 3, offset: const Offset(0, 2), spreadRadius: 0)],
             ),
             child: Row(
               children: [
@@ -645,24 +407,11 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: _tipoRelacionSeleccionada == 'representante'
-                        ? _blueDarkColor
-                        : Colors.white,
+                    color: _tipoRelacionSeleccionada == 'representante' ? _blueDarkColor : Colors.white,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _tipoRelacionSeleccionada == 'representante'
-                          ? _blueDarkColor
-                          : Colors.grey.shade400,
-                      width: 1.5,
-                    ),
+                    border: Border.all(color: _tipoRelacionSeleccionada == 'representante' ? _blueDarkColor : Colors.grey.shade400, width: 1.5),
                   ),
-                  child: Icon(
-                    Icons.badge_outlined,
-                    color: _tipoRelacionSeleccionada == 'representante'
-                        ? Colors.white
-                        : Colors.grey.shade600,
-                    size: 20,
-                  ),
+                  child: Icon(Icons.badge_outlined, color: _tipoRelacionSeleccionada == 'representante' ? Colors.white : Colors.grey.shade600, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -671,43 +420,14 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            'Representante',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _tipoRelacionSeleccionada == 'representante'
-                                  ? _blueDarkColor
-                                  : Colors.grey.shade800,
-                            ),
-                          ),
+                          Text('Representante', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _tipoRelacionSeleccionada == 'representante' ? _blueDarkColor : Colors.grey.shade800)),
                           const SizedBox(width: 8),
                           if (_tipoRelacionSeleccionada == 'representante')
-                            Container(
-                              width: 20,
-                              height: 20,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF4CAF50),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                            ),
+                            Container(width: 20, height: 20, decoration: const BoxDecoration(color: Color(0xFF4CAF50), shape: BoxShape.circle), child: const Icon(Icons.check, color: Colors.white, size: 14)),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'Representante legal de la empresa',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _tipoRelacionSeleccionada == 'representante'
-                              ? _blueDarkColor.withOpacity(0.8)
-                              : Colors.grey.shade600,
-                        ),
-                      ),
+                      Text('Representante legal de la empresa', style: TextStyle(fontSize: 12, color: _tipoRelacionSeleccionada == 'representante' ? _blueDarkColor.withOpacity(0.8) : Colors.grey.shade600)),
                     ],
                   ),
                 ),
@@ -721,18 +441,8 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
 
   Widget _buildInfoTipoRelacion(String tipoRelacion) {
     final Map<String, Map<String, String>> infoTipos = {
-      'autorizador': {
-        'titulo': 'Autorizador',
-        'descripcion':
-        'Eres una persona autorizada para realizar compras en nombre de la empresa.',
-        'permisos': '• Autorizar compras\n• Consultar historial\n• Ver líneas de crédito',
-      },
-      'representante': {
-        'titulo': 'Representante Legal',
-        'descripcion':
-        'Eres el representante legal de la empresa con permisos administrativos completos.',
-        'permisos': '• Todas las funciones de autorizador\n• Gestionar autorizadores',
-      },
+      'autorizador': {'titulo': 'Autorizador', 'descripcion': 'Eres una persona autorizada para realizar compras en nombre de la empresa.', 'permisos': '• Autorizar compras\n• Consultar historial\n• Ver líneas de crédito'},
+      'representante': {'titulo': 'Representante Legal', 'descripcion': 'Eres el representante legal de la empresa con permisos administrativos completos.', 'permisos': '• Todas las funciones de autorizador\n• Gestionar autorizadores'},
     };
     final info = infoTipos[tipoRelacion]!;
     return Container(
@@ -741,54 +451,17 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
       decoration: BoxDecoration(
         color: _blueDarkColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: _blueDarkColor.withOpacity(0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: _blueDarkColor.withOpacity(0.2)),
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 2, offset: const Offset(0, 1))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: _blueDarkColor,
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                info['titulo']!,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _blueDarkColor,
-                ),
-              ),
-            ],
-          ),
+          Row(children: [Icon(Icons.info_outline, color: _blueDarkColor, size: 16), const SizedBox(width: 8), Text(info['titulo']!, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _blueDarkColor))]),
           const SizedBox(height: 8),
-          Text(
-            info['descripcion']!,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade700,
-            ),
-          ),
+          Text(info['descripcion']!, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
           const SizedBox(height: 8),
-          Text(
-            info['permisos']!,
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-            ),
-          ),
+          Text(info['permisos']!, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
         ],
       ),
     );
@@ -798,55 +471,25 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Pin de seguridad',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: _blueDarkColor,
-          ),
-        ),
+        Text('Pin de seguridad', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _blueDarkColor)),
         const SizedBox(height: 8),
-        Text(
-          '4 dígitos numéricos',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
-        ),
+        Text('4 dígitos numéricos', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
         const SizedBox(height: 12),
         TextFormField(
           controller: _pinController,
           obscureText: _obscurePin,
           keyboardType: TextInputType.number,
-          decoration: GlobalInputStyles.inputDecoration(
-            labelText: 'Pin de seguridad',
-            prefixIcon: Icons.lock_outline,
-          ).copyWith(
+          decoration: GlobalInputStyles.inputDecoration(labelText: 'Pin de seguridad', prefixIcon: Icons.lock_outline).copyWith(
             suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePin ? Icons.visibility_off : Icons.visibility,
-                color: Colors.grey,
-              ),
-              onPressed: () {
-                setState(() {
-                  _obscurePin = !_obscurePin;
-                });
-              },
+              icon: Icon(_obscurePin ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+              onPressed: () => setState(() => _obscurePin = !_obscurePin),
             ),
           ),
           onChanged: _validarPin,
         ),
         if (_mensajeValidacionPin.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(
-            _mensajeValidacionPin,
-            style: TextStyle(
-              fontSize: 12,
-              color: _pinValido ? Colors.green : Colors.red,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          Text(_mensajeValidacionPin, style: TextStyle(fontSize: 12, color: _pinValido ? Colors.green : Colors.red, fontWeight: FontWeight.w500)),
         ],
       ],
     );
@@ -857,13 +500,7 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
     final longitudValida = value.length >= 4;
     setState(() {
       _pinValido = esNumerico && longitudValida;
-      _mensajeValidacionPin = _pinValido
-          ? 'Pin válido'
-          : (value.isEmpty
-          ? 'Ingrese un pin'
-          : (!esNumerico
-          ? 'Solo se permiten números'
-          : 'Debe tener al menos 4 dígitos'));
+      _mensajeValidacionPin = _pinValido ? 'Pin válido' : (value.isEmpty ? 'Ingrese un pin' : (!esNumerico ? 'Solo se permiten números' : 'Debe tener 4 dígitos'));
     });
   }
 
@@ -879,11 +516,17 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
             final rut = _rutController.text.trim();
             final tipoRelacion = _tipoRelacionSeleccionada!;
             final pin = _pinController.text.trim();
-            await widget.onAgregarEmpresa(rut, tipoRelacion, pin);
-            widget.onActualizarDashboard();
-            widget.onVolver();
+            final success = await widget.onAgregarEmpresa(rut, tipoRelacion, pin);
+            if (success && mounted) {
+              // Esperar un momento para que el SnackBar se muestre
+              await Future.delayed(const Duration(milliseconds: 150));
+              // Cerrar esta pantalla
+              if (mounted) Navigator.of(context, rootNavigator: true).pop();
+              // Cerrar el modal (bottom sheet) que sigue abierto debajo
+              if (mounted) Navigator.of(context, rootNavigator: true).pop();
+            }
           } catch (e) {
-            mostrarSnackBar(widget.context, 'Error: $e');
+            if (mounted) GlobalSnackBars.mostrarError(widget.context, 'Error: $e');
           } finally {
             if (mounted) setState(() => _isLoading = false);
           }
@@ -892,34 +535,19 @@ class __NuevaEmpresaScreenState extends State<_NuevaEmpresaScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: _blueDarkColor,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           elevation: 2,
         ),
         child: _isLoading
-            ? SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: Colors.white,
-          ),
-        )
-            : const Text(
-          'Agregar empresa',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+            ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Text('Agregar empresa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
     );
   }
 }
 
 // =============================================================================
-// PANTALLA DE AUTORIZADORES (MODIFICADA PARA INCLUIR PIN EN AGREGAR Y ELIMINAR)
+// PANTALLA DE AUTORIZADORES (NO MODIFICADA, PERO INCLUIDA PARA COMPLETITUD)
 // =============================================================================
 class _AutorizadoresScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -961,26 +589,21 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         _initializingToken = true;
         _errorCarga = false;
       });
-      print('🔄 Inicializando token FCM...');
       await _initializeDeviceToken();
       int attempts = 0;
       while (_deviceToken == null && attempts < 5) {
-        print('⏳ Esperando token FCM... Intento ${attempts + 1}');
         await Future.delayed(const Duration(milliseconds: 500));
         attempts++;
       }
       if (_deviceToken == null) {
-        print('⚠️ No se pudo obtener token FCM después de 5 intentos');
         setState(() {
           _errorCarga = true;
           _initializingToken = false;
         });
         return;
       }
-      print('✅ Token FCM obtenido exitosamente');
       await _cargarAutorizadores();
     } catch (e) {
-      print('❌ Error inicializando token y datos: $e');
       setState(() {
         _errorCarga = true;
         _initializingToken = false;
@@ -992,49 +615,37 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
 
   Future<void> _initializeDeviceToken() async {
     try {
-      print('🔄 Inicializando Firebase...');
       await Firebase.initializeApp();
-      print('🔄 Obteniendo token FCM...');
       String? fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null) {
-        print('✅ Token FCM obtenido exitosamente');
         setState(() => _deviceToken = fcmToken);
       } else {
-        print('⚠️ Token FCM es null, usando fallback');
         await Future.delayed(const Duration(seconds: 1));
         fcmToken = await FirebaseMessaging.instance.getToken();
         if (fcmToken != null) {
-          print('✅ Token FCM obtenido en segundo intento');
           setState(() => _deviceToken = fcmToken);
         } else {
-          print('⚠️ No se pudo obtener token FCM, creando fallback');
           final String fallbackToken = 'fcm_fallback_${DateTime.now().millisecondsSinceEpoch}';
           setState(() => _deviceToken = fallbackToken);
         }
       }
     } catch (e) {
-      print('❌ Error obteniendo token FCM: $e');
       final String errorToken = 'fcm_error_${DateTime.now().millisecondsSinceEpoch}';
       setState(() => _deviceToken = errorToken);
     }
   }
 
   Future<void> _cargarAutorizadores() async {
-    print('🔄 Cargando autorizadores...');
-    if (!mounted) {
-      print('⚠️ Widget no está montado, cancelando carga');
-      return;
-    }
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorCarga = false;
     });
     try {
       if (_deviceToken == null) {
-        print('⚠️ Token del dispositivo es null, obteniendo uno nuevo...');
         await _initializeDeviceToken();
         if (_deviceToken == null) {
-          mostrarSnackBar(context, 'No se pudo obtener el token del dispositivo');
+          GlobalSnackBars.mostrarError(context, 'No se pudo obtener el token del dispositivo');
           if (mounted) setState(() {
             _isLoading = false;
             _errorCarga = true;
@@ -1046,7 +657,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       final empresa = _getEmpresaSeleccionada();
       final tokenEmpresa = empresa?['token_empresa'] ?? '';
       if (tokenRepresentante.isEmpty || tokenEmpresa.isEmpty) {
-        mostrarSnackBar(context, 'No se pudo obtener la información necesaria');
+        GlobalSnackBars.mostrarError(context, 'No se pudo obtener la información necesaria');
         if (mounted) setState(() => _isLoading = false);
         return;
       }
@@ -1056,25 +667,19 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         'token_empresa': tokenEmpresa,
         'token_dispositivo': _deviceToken!,
       };
-      print('📡 Enviando request a la API...');
       final response = await http.post(
         Uri.parse(apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': GlobalVariables.apiKey,
-        },
+        headers: {'Content-Type': 'application/json', 'api-key': GlobalVariables.apiKey},
         body: jsonEncode(requestBody),
       ).timeout(const Duration(seconds: 10));
-      print('📡 Response recibido: Status ${response.statusCode}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == false && data['sesion_iniciada'] == false) {
-          mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
+          GlobalSnackBars.mostrarError(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
           reiniciarAplicacion(context);
           return;
         }
         final lista = data['autorizadores_designados'] ?? [];
-        print('✅ Autorizadores cargados: ${lista.length}');
         if (mounted) {
           setState(() {
             _autorizadores = List<Map<String, dynamic>>.from(lista);
@@ -1083,21 +688,18 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
           });
         }
       } else if (response.statusCode == 401) {
-        print('🔐 Sesión expirada (401 Unauthorized)');
-        mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
+        GlobalSnackBars.mostrarError(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
         reiniciarAplicacion(context);
         return;
       } else {
-        print('❌ Error en API: ${response.statusCode}');
-        mostrarSnackBar(context, 'Error al cargar autorizadores');
+        GlobalSnackBars.mostrarError(context, 'Error al cargar autorizadores');
         if (mounted) setState(() {
           _errorCarga = true;
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('❌ Excepción en _cargarAutorizadores: $e');
-      mostrarSnackBar(context, 'Error de conexión');
+      GlobalSnackBars.mostrarError(context, 'Error de conexión');
       if (mounted) setState(() {
         _errorCarga = true;
         _isLoading = false;
@@ -1106,7 +708,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
   }
 
   void _recargarLista() {
-    print('🔄 Recargando lista de autorizadores...');
     if (mounted) {
       setState(() => _isLoading = true);
       _cargarAutorizadores();
@@ -1116,7 +717,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
   Future<void> _eliminarAutorizador(Map<String, dynamic> autorizador, String pin) async {
     setState(() => _isLoading = true);
     try {
-      print('🔄 Obteniendo token del dispositivo...');
       final String deviceToken = await FCMTokenManager.getDeviceToken();
       final tokenRepresentante = widget.userData['comprador']?['token_comprador'] ?? '';
       final empresa = _getEmpresaSeleccionada();
@@ -1124,10 +724,8 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       final dvRutEmpresa = empresa?['dv_rut_empresa']?.toString() ?? '';
       final runComprador = autorizador['run_comprador']?.toString() ?? '';
       final dvRunComprador = autorizador['dv_run_comprador']?.toString() ?? '';
-      if (tokenRepresentante.isEmpty || runComprador.isEmpty || dvRunComprador.isEmpty ||
-          rutEmpresa.isEmpty || dvRutEmpresa.isEmpty) {
-        print('❌ Faltan datos para eliminar el autorizador');
-        mostrarSnackBar(context, 'Faltan datos para eliminar el autorizador');
+      if (tokenRepresentante.isEmpty || runComprador.isEmpty || dvRunComprador.isEmpty || rutEmpresa.isEmpty || dvRutEmpresa.isEmpty) {
+        GlobalSnackBars.mostrarError(context, 'Faltan datos para eliminar el autorizador');
         return;
       }
       final String apiUrl = '${GlobalVariables.baseUrl}/CambiarValidezCompradorDesignado/api/v3/';
@@ -1140,48 +738,38 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         'token_dispositivo': deviceToken,
         'pin_seguridad': pin,
       };
-      print('📡 Enviando request para eliminar autorizador...');
       final response = await http.post(
         Uri.parse(apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': GlobalVariables.apiKey,
-        },
+        headers: {'Content-Type': 'application/json', 'api-key': GlobalVariables.apiKey},
         body: jsonEncode(requestBody),
       );
-      print('📡 Response recibido: Status ${response.statusCode}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == false && data['sesion_iniciada'] == false) {
-          mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
+          GlobalSnackBars.mostrarError(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
           reiniciarAplicacion(context);
           return;
         }
         final mensaje = data['message'] ?? data['mensaje'] ?? 'Autorizador eliminado correctamente';
-        print('✅ ÉXITO: $mensaje');
-        mostrarSnackBar(context, mensaje);
+        GlobalSnackBars.mostrarExito(context, mensaje);
         _recargarLista();
       } else if (response.statusCode == 401) {
-        print('🔐 Sesión expirada (401 Unauthorized)');
-        mostrarSnackBar(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
+        GlobalSnackBars.mostrarError(context, 'Sesión cerrada. Por favor, inicia sesión nuevamente.');
         reiniciarAplicacion(context);
         return;
       } else {
         final errorData = jsonDecode(response.body);
         final errorMessage = errorData['message'] ?? errorData['mensaje'] ?? 'Error al eliminar autorizador';
-        print('❌ ERROR API: $errorMessage');
-        mostrarSnackBar(context, '$errorMessage');
+        GlobalSnackBars.mostrarError(context, errorMessage);
       }
     } catch (e) {
-      print('❌ EXCEPCIÓN: Error en _eliminarAutorizador: $e');
-      mostrarSnackBar(context, 'Error de conexión: $e');
+      GlobalSnackBars.mostrarError(context, 'Error de conexión: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _mostrarDialogoAgregarAutorizador() {
-    print('🔍 Abriendo diálogo para agregar autorizador');
     _mostrarDialogoNuevoAutorizadorConPin();
   }
 
@@ -1200,9 +788,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Container(
                 padding: const EdgeInsets.all(20),
                 child: SingleChildScrollView(
@@ -1210,48 +796,23 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Asignar Nuevo Autorizador',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _blueDarkColor,
-                        ),
-                      ),
+                      Text('Asignar Nuevo Autorizador', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _blueDarkColor)),
                       const SizedBox(height: 16),
-                      // Campo RUN
-                      Text(
-                        'RUN',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _blueDarkColor,
-                        ),
-                      ),
+                      Text('RUN', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _blueDarkColor)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: runController,
                         decoration: InputDecoration(
                           labelText: 'RUN (ej: 12345678-9)',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           filled: true,
                           fillColor: Colors.grey.shade50,
-                          suffixIcon: runController.text.isNotEmpty
-                              ? Icon(
-                            runValido ? Icons.check_circle : Icons.error,
-                            color: runValido ? Colors.green : Colors.red,
-                          )
-                              : null,
+                          suffixIcon: runController.text.isNotEmpty ? Icon(runValido ? Icons.check_circle : Icons.error, color: runValido ? Colors.green : Colors.red) : null,
                         ),
                         onChanged: (value) {
                           final formattedRun = OptionsModal._formatRut(value);
                           if (formattedRun != value) {
-                            runController.value = TextEditingValue(
-                              text: formattedRun,
-                              selection: TextSelection.collapsed(offset: formattedRun.length),
-                            );
+                            runController.value = TextEditingValue(text: formattedRun, selection: TextSelection.collapsed(offset: formattedRun.length));
                           }
                           final valido = OptionsModal._validateRut(formattedRun);
                           if (valido) {
@@ -1302,44 +863,19 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                       ),
                       if (mensajeValidacionRun.isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        Text(
-                          mensajeValidacionRun,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: runValido ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        Text(mensajeValidacionRun, style: TextStyle(fontSize: 12, color: runValido ? Colors.green : Colors.red, fontWeight: FontWeight.w500)),
                       ],
                       const SizedBox(height: 16),
-                      // Campo PIN
-                      Text(
-                        'Pin de seguridad',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _blueDarkColor,
-                        ),
-                      ),
+                      Text('Pin de seguridad', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _blueDarkColor)),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: pinController,
                         obscureText: obscurePin,
                         keyboardType: TextInputType.number,
-                        decoration: GlobalInputStyles.inputDecoration(
-                          labelText: 'Pin de seguridad',
-                          prefixIcon: Icons.lock_outline,
-                        ).copyWith(
+                        decoration: GlobalInputStyles.inputDecoration(labelText: 'Pin de seguridad', prefixIcon: Icons.lock_outline).copyWith(
                           suffixIcon: IconButton(
-                            icon: Icon(
-                              obscurePin ? Icons.visibility_off : Icons.visibility,
-                              color: Colors.grey,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                obscurePin = !obscurePin;
-                              });
-                            },
+                            icon: Icon(obscurePin ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                            onPressed: () => setState(() => obscurePin = !obscurePin),
                           ),
                         ),
                         onChanged: (value) {
@@ -1347,41 +883,21 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                           final longitudValida = value.length == 4;
                           setState(() {
                             pinValido = esNumerico && longitudValida;
-                            mensajeValidacionPin = pinValido
-                                ? 'Pin válido'
-                                : (value.isEmpty
-                                ? 'Ingrese el pin'
-                                : (!esNumerico
-                                ? 'Solo números'
-                                : 'Debe tener 4 dígitos'));
+                            mensajeValidacionPin = pinValido ? 'Pin válido' : (value.isEmpty ? 'Ingrese el pin' : (!esNumerico ? 'Solo números' : 'Debe tener 4 dígitos'));
                           });
                         },
                       ),
                       if (mensajeValidacionPin.isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        Text(
-                          mensajeValidacionPin,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: pinValido ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        Text(mensajeValidacionPin, style: TextStyle(fontSize: 12, color: pinValido ? Colors.green : Colors.red, fontWeight: FontWeight.w500)),
                       ],
                       const SizedBox(height: 24),
-                      // Botones
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           ElevatedButton(
                             onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _blueDarkColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
+                            style: ElevatedButton.styleFrom(backgroundColor: _blueDarkColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                             child: const Text('Cancelar'),
                           ),
                           const SizedBox(width: 12),
@@ -1390,7 +906,6 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                                 ? () async {
                               final run = runController.text.trim();
                               final pin = pinController.text.trim();
-                              print('✅ Confirmado: Agregando autorizador con RUN: $run y PIN: $pin');
                               final BuildContext dialogContext = context;
                               Navigator.of(dialogContext, rootNavigator: true).pop();
                               try {
@@ -1408,13 +923,7 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                               }
                             }
                                 : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _blueDarkColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
+                            style: ElevatedButton.styleFrom(backgroundColor: _blueDarkColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                             child: const Text('Asignar'),
                           ),
                         ],
@@ -1446,61 +955,27 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Container(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Eliminar Autorizador',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _blueDarkColor,
-                      ),
-                    ),
+                    Text('Eliminar Autorizador', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _blueDarkColor)),
                     const SizedBox(height: 16),
-                    Text(
-                      '¿Estás seguro de eliminar a "$nombre" (${runFormateado.isNotEmpty ? runFormateado : 'RUN no disponible'})?',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade800,
-                        height: 1.4,
-                      ),
-                    ),
+                    Text('¿Estás seguro de eliminar a "$nombre" (${runFormateado.isNotEmpty ? runFormateado : 'RUN no disponible'})?', style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.4)),
                     const SizedBox(height: 16),
-                    // Campo PIN
-                    Text(
-                      'Ingresa tu pin de seguridad',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: _blueDarkColor,
-                      ),
-                    ),
+                    Text('Ingresa tu pin de seguridad', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _blueDarkColor)),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: pinController,
                       obscureText: obscurePin,
                       keyboardType: TextInputType.number,
-                      decoration: GlobalInputStyles.inputDecoration(
-                        labelText: 'Pin de seguridad',
-                        prefixIcon: Icons.lock_outline,
-                      ).copyWith(
+                      decoration: GlobalInputStyles.inputDecoration(labelText: 'Pin de seguridad', prefixIcon: Icons.lock_outline).copyWith(
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            obscurePin ? Icons.visibility_off : Icons.visibility,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              obscurePin = !obscurePin;
-                            });
-                          },
+                          icon: Icon(obscurePin ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                          onPressed: () => setState(() => obscurePin = !obscurePin),
                         ),
                       ),
                       onChanged: (value) {
@@ -1508,62 +983,33 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
                         final longitudValida = value.length == 4;
                         setState(() {
                           pinValido = esNumerico && longitudValida;
-                          mensajeValidacionPin = pinValido
-                              ? 'Pin válido'
-                              : (value.isEmpty
-                              ? 'Ingrese el pin'
-                              : (!esNumerico
-                              ? 'Solo números'
-                              : 'Debe tener 4 dígitos'));
+                          mensajeValidacionPin = pinValido ? 'Pin válido' : (value.isEmpty ? 'Ingrese el pin' : (!esNumerico ? 'Solo números' : 'Debe tener 4 dígitos'));
                         });
                       },
                     ),
                     if (mensajeValidacionPin.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        mensajeValidacionPin,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: pinValido ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      Text(mensajeValidacionPin, style: TextStyle(fontSize: 12, color: pinValido ? Colors.green : Colors.red, fontWeight: FontWeight.w500)),
                     ],
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton(
-                          onPressed: () {
-                            print('❌ Eliminación cancelada');
-                            Navigator.of(context, rootNavigator: true).pop();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _blueDarkColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
+                          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                          style: ElevatedButton.styleFrom(backgroundColor: _blueDarkColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                           child: const Text('Cancelar'),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
                           onPressed: pinValido
                               ? () async {
-                            print('✅ Iniciando eliminación de: $nombre');
                             final pin = pinController.text.trim();
                             Navigator.of(context, rootNavigator: true).pop();
                             await _eliminarAutorizador(autorizador, pin);
                           }
                               : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _blueDarkColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: _blueDarkColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                           child: const Text('Eliminar'),
                         ),
                       ],
@@ -1581,18 +1027,14 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
   Map<String, dynamic>? _getEmpresaSeleccionada() {
     if (widget.empresaSeleccionada == null) return null;
     final empresas = widget.userData['empresas'] ?? [];
-    return empresas.firstWhere(
-          (emp) => emp['token_empresa'] == widget.empresaSeleccionada,
-      orElse: () => {},
-    );
+    return empresas.firstWhere((emp) => emp['token_empresa'] == widget.empresaSeleccionada, orElse: () => {});
   }
 
   bool _esRepresentanteValido(Map<String, dynamic>? empresa) {
     if (empresa == null || empresa.isEmpty) return false;
     final tipoRelacion = empresa['tipo_relacion']?.toString().toLowerCase() ?? '';
     final validezRelacion = empresa['validez_relacion']?.toString().toLowerCase() ?? '';
-    return tipoRelacion.contains('representante') &&
-        !validezRelacion.contains('no válida');
+    return tipoRelacion.contains('representante') && !validezRelacion.contains('no válida');
   }
 
   Widget _buildTituloEmpresa() {
@@ -1610,24 +1052,8 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              nombreEmpresa,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: _blueDarkColor,
-              ),
-            ),
-            if (rutFormateado.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                'RUT: $rutFormateado',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
+            Text(nombreEmpresa, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _blueDarkColor)),
+            if (rutFormateado.isNotEmpty) ...[const SizedBox(height: 4), Text('RUT: $rutFormateado', style: TextStyle(fontSize: 14, color: Colors.grey.shade600))],
           ],
         ),
       ),
@@ -1639,38 +1065,17 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.people_outline,
-            color: Colors.grey.shade400,
-            size: 80,
-          ),
+          Icon(Icons.people_outline, color: Colors.grey.shade400, size: 80),
           const SizedBox(height: 20),
-          Text(
-            'No hay autorizadores asignados',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text('No hay autorizadores asignados', style: TextStyle(fontSize: 18, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Text(
-            'Asigna personas que puedan comprar en nombre de la empresa',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-            ),
-          ),
+          Text('Asigna personas que puedan comprar en nombre de la empresa', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
         ],
       ),
     );
   }
 
-  Widget _buildItemAutorizador({
-    required Map<String, dynamic> autorizador,
-    required int index,
-  }) {
+  Widget _buildItemAutorizador({required Map<String, dynamic> autorizador, required int index}) {
     final nombre = autorizador['nombre_comprador'] ?? 'Sin nombre';
     final runComprador = autorizador['run_comprador']?.toString() ?? '';
     final dvRunComprador = autorizador['dv_run_comprador']?.toString() ?? '';
@@ -1681,83 +1086,33 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade300, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.3),
-            blurRadius: 3,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.3), blurRadius: 3, offset: const Offset(0, 2), spreadRadius: 0)],
       ),
       child: Card(
         margin: EdgeInsets.zero,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide.none,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide.none),
         child: Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _approvedCardBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
+          decoration: BoxDecoration(color: _approvedCardBackground, borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: _blueDarkColor.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.person,
-                  color: _blueDarkColor,
-                  size: 20,
-                ),
-              ),
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: _blueDarkColor.withOpacity(0.1), shape: BoxShape.circle), child: Icon(Icons.person, color: _blueDarkColor, size: 20)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      nombre,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
-                    ),
+                    Text(nombre, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black)),
                     const SizedBox(height: 4),
-                    if (runComprador.isNotEmpty && dvRunComprador.isNotEmpty) ...[
-                      Text(
-                        'RUN: ${OptionsModal._formatRut(runCompleto)}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
+                    if (runComprador.isNotEmpty && dvRunComprador.isNotEmpty) Text('RUN: ${OptionsModal._formatRut(runCompleto)}', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: verificado ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            verificado ? 'Verificado' : 'No verificado',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: verificado ? Colors.green : Colors.orange,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          decoration: BoxDecoration(color: verificado ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                          child: Text(verificado ? 'Verificado' : 'No verificado', style: TextStyle(fontSize: 12, color: verificado ? Colors.green : Colors.orange, fontWeight: FontWeight.w500)),
                         ),
                       ],
                     ),
@@ -1767,16 +1122,10 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
               Container(
                 width: 36,
                 height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), shape: BoxShape.circle),
                 child: IconButton(
                   icon: Icon(Icons.close, color: Colors.red, size: 18),
-                  onPressed: () {
-                    print('❌ Eliminando autorizador: $nombre');
-                    _mostrarDialogoEliminarAutorizador(autorizador);
-                  },
+                  onPressed: () => _mostrarDialogoEliminarAutorizador(autorizador),
                   padding: EdgeInsets.zero,
                   splashRadius: 20,
                   tooltip: 'Eliminar autorizador',
@@ -1794,29 +1143,11 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.error_outline,
-            color: Colors.red,
-            size: 80,
-          ),
+          Icon(Icons.error_outline, color: Colors.red, size: 80),
           const SizedBox(height: 20),
-          Text(
-            'Error al cargar autorizadores',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text('Error al cargar autorizadores', style: TextStyle(fontSize: 18, color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _initializeTokenAndFetchData,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _blueDarkColor,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Reintentar'),
-          ),
+          ElevatedButton(onPressed: _initializeTokenAndFetchData, style: ElevatedButton.styleFrom(backgroundColor: _blueDarkColor, foregroundColor: Colors.white), child: const Text('Reintentar')),
         ],
       ),
     );
@@ -1830,65 +1161,17 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _blueDarkColor),
-          onPressed: () {
-            print('⬅️ Regresando a pantalla anterior');
-            widget.onVolver();
-          },
-        ),
-        title: Text(
-          'Autorizadores',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: _blueDarkColor,
-          ),
-        ),
-        actions: [
-          if (esRepresentanteValido)
-            IconButton(
-              icon: Icon(Icons.person_add, color: _blueDarkColor),
-              onPressed: _mostrarDialogoAgregarAutorizador,
-              tooltip: 'Agregar autorizador',
-            ),
-        ],
+        leading: IconButton(icon: Icon(Icons.arrow_back, color: _blueDarkColor), onPressed: widget.onVolver),
+        title: Text('Autorizadores', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _blueDarkColor)),
+        actions: [if (esRepresentanteValido) IconButton(icon: Icon(Icons.person_add, color: _blueDarkColor), onPressed: _mostrarDialogoAgregarAutorizador, tooltip: 'Agregar autorizador')],
       ),
       body: _initializingToken
           ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: _blueDarkColor,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Inicializando dispositivo...',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(color: _blueDarkColor), const SizedBox(height: 16), Text('Inicializando dispositivo...', style: TextStyle(color: Colors.grey.shade600))]),
       )
           : _isLoading
           ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: _blueDarkColor,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Cargando autorizadores...',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(color: _blueDarkColor), const SizedBox(height: 16), Text('Cargando autorizadores...', style: TextStyle(color: Colors.grey.shade600))]),
       )
           : _errorCarga
           ? _buildErrorCarga()
@@ -1900,20 +1183,9 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.orange,
-                    size: 48,
-                  ),
+                  Icon(Icons.info_outline, color: Colors.orange, size: 48),
                   const SizedBox(height: 16),
-                  Text(
-                    'Solo el representante legal puede gestionar autorizadores',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
+                  Text('Solo el representante legal puede gestionar autorizadores', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey.shade700)),
                 ],
               ),
             ),
@@ -1921,21 +1193,12 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
             child: _autorizadores.isEmpty
                 ? _buildEstadoVacio()
                 : RefreshIndicator(
-              onRefresh: () async {
-                print('🔄 Actualizando lista...');
-                await _cargarAutorizadores();
-              },
+              onRefresh: () async => _cargarAutorizadores(),
               color: _blueDarkColor,
               child: ListView.builder(
                 itemCount: _autorizadores.length,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                itemBuilder: (context, index) {
-                  final autorizador = _autorizadores[index];
-                  return _buildItemAutorizador(
-                    autorizador: autorizador,
-                    index: index,
-                  );
-                },
+                itemBuilder: (context, index) => _buildItemAutorizador(autorizador: _autorizadores[index], index: index),
               ),
             ),
           ),
@@ -1957,33 +1220,20 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
     print('🎯 INICIANDO API _asignarAutorizadorApi (v3)');
     print('══════════════════════════════════════════════════════════════');
     try {
-      print('🔄 Obteniendo token del dispositivo...');
       final String deviceToken = await FCMTokenManager.getDeviceToken();
       final tokenComprador = userData['comprador']?['token_comprador'] ?? '';
       final runComprador = userData['comprador']?['run_comprador']?.toString() ?? '';
       final dvRunComprador = userData['comprador']?['dv_run_comprador']?.toString() ?? '';
-      if (tokenComprador.isEmpty || runComprador.isEmpty || dvRunComprador.isEmpty) {
-        print('❌ Faltan datos del comprador');
-        return;
-      }
+      if (tokenComprador.isEmpty || runComprador.isEmpty || dvRunComprador.isEmpty) return;
       final empresas = userData['empresas'] ?? [];
-      final empresaSeleccionada = empresas.firstWhere(
-            (emp) => emp['seleccionada'] == true,
-        orElse: () => empresas.isNotEmpty ? empresas[0] : {},
-      );
-      if (empresaSeleccionada.isEmpty) {
-        print('❌ No hay empresa seleccionada');
-        return;
-      }
+      final empresaSeleccionada = empresas.firstWhere((emp) => emp['seleccionada'] == true, orElse: () => empresas.isNotEmpty ? empresas[0] : {});
+      if (empresaSeleccionada.isEmpty) return;
       final rutEmpresa = empresaSeleccionada['rut_empresa']?.toString() ?? '';
       final dvEmpresa = empresaSeleccionada['dv_rut_empresa']?.toString() ?? '';
       final runParseado = OptionsModal._parseRut(run);
       final runAutorizador = runParseado['numero'] ?? '';
       final dvRunAutorizador = runParseado['dv'] ?? '';
-      if (runAutorizador.isEmpty || dvRunAutorizador.isEmpty) {
-        print('❌ RUN inválido');
-        return;
-      }
+      if (runAutorizador.isEmpty || dvRunAutorizador.isEmpty) return;
       final requestBody = {
         "token_representante": tokenComprador,
         "run_autorizador": runAutorizador,
@@ -1993,47 +1243,32 @@ class _AutorizadoresScreenState extends State<_AutorizadoresScreen> {
         "token_dispositivo": deviceToken,
         "pin_seguridad": pin,
       };
-      print('📡 Enviando request a la API...');
-      print('Request: $requestBody');
       final response = await http.post(
         Uri.parse('${GlobalVariables.baseUrl}/CrearAutorizador/api/v3/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'api-key': GlobalVariables.apiKey,
-        },
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'api-key': GlobalVariables.apiKey},
         body: json.encode(requestBody),
       ).timeout(const Duration(seconds: 15));
-      print('📡 Response recibido: Status ${response.statusCode}');
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) {
-          print('🔐 Sesión expirada');
-          return;
-        }
+        if (responseData['success'] == false && responseData['sesion_iniciada'] == false) return;
         if (responseData['success'] == true) {
           final mensaje = responseData['message'] ?? 'Autorizador asignado exitosamente';
-          print('✅ ÉXITO: $mensaje');
+          GlobalSnackBars.mostrarExito(context, mensaje);
           onAsignarAutorizador(run);
-
-          // 🔄 Recargar la lista de autorizadores para reflejar el cambio
           _cargarAutorizadores();
-
-          if (onActualizarAutorizadores != null) {
-            print('🔄 Ejecutando onActualizarAutorizadores...');
-            onActualizarAutorizadores();
-          }
+          if (onActualizarAutorizadores != null) onActualizarAutorizadores();
         } else {
           final mensajeError = responseData['message'] ?? responseData['error'] ?? 'Error al asignar autorizador';
-          print('❌ ERROR API: $mensajeError');
+          GlobalSnackBars.mostrarError(context, mensajeError);
         }
       } else if (response.statusCode == 401) {
-        print('🔐 Sesión expirada (401 Unauthorized)');
+        GlobalSnackBars.mostrarError(context, 'Sesión expirada. Inicie sesión nuevamente.');
+        reiniciarAplicacion(context);
       } else {
-        print('❌ ERROR HTTP: Status ${response.statusCode}');
+        GlobalSnackBars.mostrarError(context, 'Error al asignar autorizador');
       }
     } catch (e) {
-      print('❌ EXCEPCIÓN: Error en _asignarAutorizadorApi: $e');
+      GlobalSnackBars.mostrarError(context, 'Error de conexión: ${e.toString().split(':').first}');
     }
   }
 }

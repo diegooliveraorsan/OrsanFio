@@ -113,12 +113,14 @@ class NotificationHandler {
 
       // Obtener token_comprador del payload
       final tokenComprador = message.data['token_comprador'] ?? '';
+      final tokenVenta = message.data['token_venta'] ?? '';
       final maximoTiempo = '15';
 
       print('📊 [NotificationHandler] Datos para API AbrirNotificacion:');
       print('   • fecha_envio_notificacion: $fechaFormateada');
       print('   • maximo_tiempo: $maximoTiempo');
       print('   • token_comprador: $tokenComprador');
+      print('   • tokenVenta: $tokenVenta');
       print('   • token_dispositivo: $_deviceToken');
 
       // Validar que tenemos los datos necesarios
@@ -140,14 +142,15 @@ class NotificationHandler {
         "maximo_tiempo": maximoTiempo,
         "token_comprador": tokenComprador,
         "token_dispositivo": _deviceToken!,
+        "token_venta": tokenVenta
       };
 
       print('📤 [NotificationHandler] Enviando petición a API:');
-      print('   • URL: ${GlobalVariables.baseUrl}/AbrirNotificacion/api/v1/');
+      print('   • URL: ${GlobalVariables.baseUrl}/AbrirNotificacion/api/v2/');
       print('   • Body: ${json.encode(requestBody)}');
 
       final response = await http.post(
-        Uri.parse('${GlobalVariables.baseUrl}/AbrirNotificacion/api/v1/'),
+        Uri.parse('${GlobalVariables.baseUrl}/AbrirNotificacion/api/v2/'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

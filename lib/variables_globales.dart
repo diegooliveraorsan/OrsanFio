@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class GlobalVariables {
   static const String apiKey = 'X4bFio9qWzM1kP6rS8nY';
   static const String baseUrl = 'https://apiorsanpay.orsanevaluaciones.cl';
-  static const String appVersion = "1.0.1";
+  static const String appVersion = "1.1.0";
 
   static const bool isDebugMode = false; // Cambiar a false en producción
   static void debugPrint(String message) {

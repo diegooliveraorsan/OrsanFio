@@ -5,6 +5,8 @@ import '../document_reader/document_reader_service.dart';
 import '../face_api/face_api_service.dart';
 import '../dashboard_screen.dart';
 import '../variables_globales.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 
 // Clase de utilidades para RUT chileno
 class RutUtils {
@@ -637,6 +639,17 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
       return;
     }
 
+    if (await Permission.camera.request().isGranted) {
+      // Permiso concedido, continuar con la verificación facial
+      print('✅ Permiso de cámara concedido');
+    } else {
+      // Permiso denegado
+      if (mounted) {
+        GlobalSnackBars.mostrarError(context, 'Se necesita permiso de cámara para la verificación facial');
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _currentStep = 'Capturando rostro...';
@@ -685,7 +698,7 @@ class _OrsanfioHomeState extends State<OrsanfioHome> with WidgetsBindingObserver
 
       } else {
         final error = result?['error'] ?? 'Captura facial falló o fue cancelada';
-        if (mounted) GlobalSnackBars.mostrarError(context, '❌ $error');
+        if (mounted) GlobalSnackBars.mostrarError(context, '$error');
         setState(() {
           _faceStatus = 'No capturado';
           _currentStep = _getCurrentStepMessage();
